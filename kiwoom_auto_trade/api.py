@@ -10,7 +10,7 @@ import datetime
 TR_REQ_TIME_INTERVAL = 0.2
 
 
-class Kiwoom(QAxWidget):  # 키움증권의 OpenAPI 가 제공하는 메서드를 호출하기 위해서 QAxWidget 클래스의 인스턴스 필요
+class KiwoomAPI(QAxWidget):  # 키움증권의 OpenAPI 가 제공하는 메서드를 호출하기 위해서 QAxWidget 클래스의 인스턴스 필요
     def __init__(self):
         super().__init__()
         self._create_kiwoom_instance()
