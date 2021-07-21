@@ -19,7 +19,7 @@ SELL_FACTOR2 = 1
 STANDARD = 10000000
 LIMIT = 5  # 조각의 개수를 제한해줘야 한다, 조각당 백만원은 있어야 할듯
 MONEY = 1000000
-
+ACCOUNT_NUM = "8000927211"
 
 class Kiwoom(QAxWidget):  # 키움증권의 OpenAPI 가 제공하는 메서드를 호출하기 위해서 QAxWidget 클래스의 인스턴스 필요
     def __init__(self):
@@ -157,8 +157,7 @@ class Kiwoom(QAxWidget):  # 키움증권의 OpenAPI 가 제공하는 메서드�
         print("주문수량:", self.stock[sCode].own_num, end=' ')  # 주문수량
         price = self.get_chejan_data(901)
         print("주문가격:", price, end=' ')  # 주문가격
-        temp1 = self.get_chejan_data(902)
-        # print('거래 잔량:', temp1)
+        temp1 = self.get_chejan_data(902)  # 거래 잔량
         if temp1:
             self.stock[sCode].not_yet = int(temp1)  # 거래 잔량
         print("미체결수량:", self.stock[sCode].not_yet, end='\n\n')
@@ -169,14 +168,12 @@ class Kiwoom(QAxWidget):  # 키움증권의 OpenAPI 가 제공하는 메서드�
                     return
                 self.buy_list.append(sCode)
                 print(str(self.stock[sCode].own_num) + '주 매수 완료', end='\n')
-                print("가지고 있는 종목 개수: ", len(self.buy_list))
-                print(self.buy_list)
+                # print("가지고 있는 종목 개수: ", len(self.buy_list))
+                # print(self.buy_list)
                 self.stock[sCode].sell_price = find_sell_price(self.stock[sCode].price_time[0], SELL_FACTOR1)
                 time.sleep(0.2)
-                print("little rest")
-                self.send_order("send_order_rq", 8020 + len(self.buy_list), "8000927211", 2, sCode,
+                self.send_order("send_order_rq", 8020 + len(self.buy_list), ACCOUNT_NUM, 2, sCode,
                                 self.stock[sCode].own_num, self.stock[sCode].sell_price, '00', "")  # 매도 조건1의 위치
-                # 매수 정정 후 완료된 경우 매도주문이 안들어감
                 print("올려서 매도 주문함")
             elif temp == '-매도':
                 try:
@@ -185,8 +182,6 @@ class Kiwoom(QAxWidget):  # 키움증권의 OpenAPI 가 제공하는 메서드�
                     self.stock[sCode].after_trade = True
                 except (KeyError, ValueError):
                     pass
-
-                # del self.sell_list[sCode]
                 # 주문 취소를 하면 매도 완료가 된다, 근데 왜 매도 완료가 되느냐, 하고 묻는다면 매도 주문을 취소해서 그런 것 같다
                 # 주문 취소를 하면 어디서인가 keyerror가 뜬다, 프로그램 오류 후 주문을 정정할때
 
@@ -302,9 +297,7 @@ class Kiwoom(QAxWidget):  # 키움증권의 OpenAPI 가 제공하는 메서드�
             if hour == 15 and minute == 30:
                 self._save_callback()
                 self.event_loop.exit()
-            if price < 0:
-                price = -price
-
+            price = max(-price, price)
             # 만약 남은 거래가 있고, 그 거래의 주문 시간이 지금 시간보다 10초 이상 적을 경우, 그 주문을 취소해버리는 그런 파트가 필요
             # 거래 파트
             # 매도 파트에서는 standard / 10 이상의 금액이 오고가는 거래만 취급한다
@@ -326,20 +319,15 @@ class Kiwoom(QAxWidget):  # 키움증권의 OpenAPI 가 제공하는 메서드�
                         print(str(sCode) + "의 매수취소량:", self.stock[sCode].not_yet, clock, end=' ')
                         temp = self.stock[sCode].not_yet
                         self.stock[sCode].not_yet = 0
-                        self.send_order("send_order_rq", 8010, "8000927211", 3, sCode,
-                                        temp, 0, '00', self.stock[sCode].order_num)
+                        self.send_order("send_order_rq", 8010, ACCOUNT_NUM, 3, sCode, temp, 0, '03',
+                                        self.stock[sCode].order_num)
                         # 과열 종목이라 매수 취소가 아예 안먹는 경우가 있다, 어떻게 해결해야할까
-                    # 손해를 본 경우 매도주문을 수정해서 매도, 이 경우 가격은 최우선매도호가, 빨리 팔아버려야함
                     if sCode in self.buy_list:
                         buy_price = self.stock[sCode].price_time[0]
                         if price <= buy_price * (1 - 1 / 100 * SELL_FACTOR2):  # 매도 조건2의 위치
-                            self.stock[sCode].undo = True  # 이 파트가 문제인데, 딱 한번만 해줘야할듯, 아니면 주문 걸고 시간을 보거나
-                            sell_price = self._comm_real_data(sCode, 27)  # 최우선 매도호가
-                            if sell_price[0] == '-':
-                                sell_price = sell_price[1:]
-                            # print(self.sell_list, sCode)
-                            self.send_order("send_order_rq", 8010 + self.buy_list.index(sCode), "8000927211", 6, sCode,
-                                            self.stock[sCode].own_num, int(sell_price), '00', self.stock[sCode].order_num)
+                            self.stock[sCode].undo = True
+                            self.send_order("send_order_rq", 8010 + self.buy_list.index(sCode), ACCOUNT_NUM, 6, sCode,
+                                            self.stock[sCode].own_num, 0, '03', self.stock[sCode].order_num)
                             print(sCode, "손해 매도 주문", clock, "걸린 시간: " +
                                   str(now - self.stock[sCode].price_time[1] // 60) + "분")
                             # 손해를 보자마자 파는게 아니라 손해 1퍼를 찍고 나면 기댓값을 반으로 줄여서 돌려보는게 어떤가 싶기는 한데
@@ -357,16 +345,12 @@ class Kiwoom(QAxWidget):  # 키움증권의 OpenAPI 가 제공하는 메서드�
                         if high[0] >= low[0] * (1 + 1 / 100 * BUY_FACTOR) and high[1] > low[1]:  # 매수 조건의 인자
                             self.stock[sCode].own = True
                             if LIMIT > len(self.buy_list):
-                                price = self._comm_real_data(sCode, 28)  # 최우선 매수호가
-                                if price[0] == '-':
-                                    price = price[1:]
-                                price = int(price)
                                 order_num = MONEY // price
                                 self.stock[sCode].own_num = order_num  # 매수하고자 하는 개수
                                 self.stock[sCode].not_yet = order_num  # 미체결 개수
                                 beepsound()  # 삐 소리가 나게 함
-                                self.send_order("send_order_rq", 8010 + len(self.buy_list), "8000927211", 1, sCode,
-                                                order_num, price, '00', "")
+                                self.send_order("send_order_rq", 8010 + len(self.buy_list), ACCOUNT_NUM, 1, sCode,
+                                                order_num, 0, '03', "")
                                 print("매수", sCode, clock)
                                 self.stock[sCode].price_time = [price, now * 60 + second]
                             else:
