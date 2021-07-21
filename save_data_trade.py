@@ -12,10 +12,10 @@ import winsound as sd
 
 TR_REQ_TIME_INTERVAL = 0.2
 
-TIME_FACTOR = 5
-BUY_FACTOR = 4
+TIME_FACTOR = 6
+BUY_FACTOR = 5
 SELL_FACTOR1 = 5
-SELL_FACTOR2 = 1
+SELL_FACTOR2 = 2
 STANDARD = 10000000
 LIMIT = 5  # 조각의 개수를 제한해줘야 한다, 조각당 백만원은 있어야 할듯
 MONEY = 1000000
@@ -153,10 +153,10 @@ class Kiwoom(QAxWidget):  # 키움증권의 OpenAPI 가 제공하는 메서드�
         self.stock[sCode].order_num = order_num
         print(self.stock[sCode].order_num, end=' ')  # 주문번호
         name = self.get_chejan_data(302).strip()
-        print(name, sCode)  # 종목명, 종목코드
-        print("주문수량:", self.stock[sCode].own_num, end=' ')  # 주문수량
-        price = self.get_chejan_data(901)
-        print("주문가격:", price, end=' ')  # 주문가격
+        print(name, sCode, end=' ')  # 종목명, 종목코드
+        # print("주문수량:", self.stock[sCode].own_num, end=' ')  # 주문수량
+        # price = self.get_chejan_data(901)
+        # print("주문가격:", price, end=' ')  # 주문가격
         temp1 = self.get_chejan_data(902)  # 거래 잔량
         if temp1:
             self.stock[sCode].not_yet = int(temp1)  # 거래 잔량
@@ -167,14 +167,14 @@ class Kiwoom(QAxWidget):  # 키움증권의 OpenAPI 가 제공하는 메서드�
                 if self.stock[sCode].own_num == 0:
                     return
                 self.buy_list.append(sCode)
-                print(str(self.stock[sCode].own_num) + '주 매수 완료', end='\n')
+                print(self.stock[sCode].own_num, '주 매수 완료', end='\n')
                 # print("가지고 있는 종목 개수: ", len(self.buy_list))
                 # print(self.buy_list)
                 self.stock[sCode].sell_price = find_sell_price(self.stock[sCode].price_time[0], SELL_FACTOR1)
                 time.sleep(0.2)
                 self.send_order("send_order_rq", 8020 + len(self.buy_list), ACCOUNT_NUM, 2, sCode,
                                 self.stock[sCode].own_num, self.stock[sCode].sell_price, '00', "")  # 매도 조건1의 위치
-                print("올려서 매도 주문함")
+                # print("올려서 매도 주문함")
             elif temp == '-매도':
                 try:
                     print(name, "매도 완료")
@@ -326,8 +326,10 @@ class Kiwoom(QAxWidget):  # 키움증권의 OpenAPI 가 제공하는 메서드�
                         buy_price = self.stock[sCode].price_time[0]
                         if price <= buy_price * (1 - 1 / 100 * SELL_FACTOR2):  # 매도 조건2의 위치
                             self.stock[sCode].undo = True
-                            self.send_order("send_order_rq", 8010 + self.buy_list.index(sCode), ACCOUNT_NUM, 6, sCode,
-                                            self.stock[sCode].own_num, 0, '03', self.stock[sCode].order_num)
+                            self.send_order("send_order_rq", 8010 + self.buy_list.index(sCode), ACCOUNT_NUM, 4, sCode,
+                                            self.stock[sCode].own_num, 0, '00', self.stock[sCode].order_num)
+                            self.send_order("send_order_rq", 8011 + self.buy_list.index(sCode), ACCOUNT_NUM, 2, sCode,
+                                            self.stock[sCode].own_num, 0, '03', "")
                             print(sCode, "손해 매도 주문", clock, "걸린 시간: " +
                                   str(now - self.stock[sCode].price_time[1] // 60) + "분")
                             # 손해를 보자마자 파는게 아니라 손해 1퍼를 찍고 나면 기댓값을 반으로 줄여서 돌려보는게 어떤가 싶기는 한데
@@ -359,8 +361,7 @@ class Kiwoom(QAxWidget):  # 키움증권의 OpenAPI 가 제공하는 메서드�
                         # 거래량이 파멸적으로 줄어든 종목은 미래가 없다고 가정?
                         # 그 시점에서 팔아버리면?
                         # 손해 매도 주문을 시장가로 해야할 것 같은데?
-                        # 처음에 일정 퍼센트 이상 오른 주식은 매수하지 않는 편이 나을지도?확인해보자
-        # 차라리 다양한 변수를 만들어주는게 오히려 시간이 덜 걸릴지도?
+                        # 처음에 일정 퍼센트 이상 오른 주식은 매수하지 않는 편이 나을지도?나중에 확인해보자
 
     def _comm_real_data(self, strcode, nFid):  # 종목 코드, 실시간 목록 내에 있는 피드값
         ret = self.dynamicCall("GetCommRealData(QString, int)", strcode, nFid)
@@ -370,7 +371,6 @@ class Kiwoom(QAxWidget):  # 키움증권의 OpenAPI 가 제공하는 메서드�
         ret = self.dynamicCall("SetRealReg(QString, QString, QString, QString)", strScreenNo, strCodeList, strFidList,
                                strOptType)  # 한번에 100개 등록 가능, 코드 리스트와 피드는 ; 로 구분
         return ret
-
     # 타입 0: 마지막에 등록한 종목들만 실시간등록, 1: 이전에 실시간 등록한 종목들에 추가하고 싶을 때
 
     @staticmethod
@@ -378,11 +378,6 @@ class Kiwoom(QAxWidget):  # 키움증권의 OpenAPI 가 제공하는 메서드�
         strip_data = data.lstrip('-0')
         if strip_data == '':
             strip_data = '0'
-
-        # try:
-        #    format_data = format(int(strip_data), ',d')
-        # except:
-        #    format_data = format(float(strip_data))
 
         if data.startswith('-'):
             strip_data = '-' + strip_data
@@ -553,8 +548,6 @@ if __name__ == "__main__":
     kiwoom.event_loop = QEventLoop()
     kiwoom.event_loop.exec()
 
-    # time.sleep(60)
-
     kiwoom.set_input_value("계좌번호", "8000927211")
     kiwoom.comm_rq_data("opw00001_req", "opw00001", 0, "7777")
 
@@ -572,7 +565,6 @@ if __name__ == "__main__":
     print('프로그램 종료')
 # 지금 프로그램을 어떻게 하면 실전으로 바꿀 수 있는지 확인해봐야함
 # 단순히 계좌번호를 바꾸는 것으로는 안될 것 같은데?
-# 매도 및 매수를 시장가로 바꾸고, 이득보는 판매 가격만 지정가로 하는게 나을거같은데?
-# 최우선 매수호가에서 또 오른값으로 팔아서 문제가 생기는 경우도 다수 존재
-# 그러면 원래 가격에서 오른값으로 팔아야함, 시장가로 사는게 제일 합리적인듯
-# 3시 반 이후 깃허브에 저장하고 그 이후에 수정해보기
+# 파이썬 로거 사용해보기
+# 3시가 되면 보유중인 주식을 싹 팔고 저장만 하는 것이 어떤가?
+# 시장가로 하면 매수 주문이 성사되지 않을 가능성은? 없다면 매수 취소 부분은 제거해도 된다
