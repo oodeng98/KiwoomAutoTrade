@@ -257,3 +257,45 @@ if __name__ == "__main__":
 
         account_number = kiwoom.get_login_info("ACCNO")
         account_number = account_number.split(';')[0]
+
+
+class FID:
+    class CreditBalance:
+        """신용잔고"""
+
+        @property
+        def sector_name(self) -> int:
+            """종목명"""
+            return 302
+
+    class OrderExecution:
+        """주문체결"""
+
+        @property
+        def sector_code(self) -> int:
+            """종목코드, 업종코드"""
+            return 9001
+
+        @property
+        def outstanding(self) -> int:
+            """미체결수량"""
+            return 902
+
+        @property
+        def order_classification(self) -> int:
+            """주문구분(+현금내수,-현금매도…)"""
+            return 905
+
+
+    class StockQuote:
+        """주식시세"""
+
+        @property
+        def account_number(self) -> int:
+            """계좌번호"""
+            return 9201
+
+        @property
+        def order_number(self) -> int:
+            """계좌번호"""
+            return 9203
