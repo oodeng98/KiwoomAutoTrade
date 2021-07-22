@@ -12,7 +12,7 @@ DATABASE_PATH = os.path.join('.', 'data', now.strftime('%Y%m%d.db'))
 
 class Database:
     def __init__(self):
-        self.con: sqlite3.Connection = None
+        self.con: sqlite3.Connection = None # type: ignore
 
         self.get_db_connect()
 
