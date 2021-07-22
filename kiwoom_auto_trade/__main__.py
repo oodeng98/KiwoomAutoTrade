@@ -4,6 +4,7 @@ import sys
 from PyQt5.QtCore import QEventLoop
 from PyQt5.QtWidgets import QApplication
 
+from kiwoom_auto_trade.api import FID
 from kiwoom_auto_trade.api import KiwoomOpenAPI
 from kiwoom_auto_trade.db import Database
 
@@ -12,6 +13,14 @@ class KiwoomAutoTrade(KiwoomOpenAPI):
     def __init__(self):
         self.db = Database()
         super().__init__()
+
+
+    def get_chejan_data(self, fid) -> str:
+        """체결 잔고 데이터를 가져옵니다.
+
+        '체'결 '잔'고 -> CHE JAN 깔깔
+        """
+        return super().get_chejan_data(fid).strip()
 
 
 if __name__ == "__main__":
