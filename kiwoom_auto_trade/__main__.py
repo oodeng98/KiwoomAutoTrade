@@ -23,6 +23,24 @@ class KiwoomAutoTrade(KiwoomOpenAPI):
         return super().get_chejan_data(fid).strip()
 
 
+    def _receive_chejan_data(self, gubun, item_cnt, fid_list):
+        order_number = int(self.get_chejan_data(FID.StockQuote.order_number))
+        if not order_number:
+            return
+        sector_code = int(self.get_chejan_data(FID.OrderExecution.sector_code))
+        sector_name = self.get_chejan_data(FID.CreditBalance.sector_name)
+        outstanding = int(self.get_chejan_data(FID.OrderExecution.outstanding))
+        if not outstanding:
+            order_classification = self.get_chejan_data(FID.OrderExecution.order_classification)
+            #XXX(oodeng98, Hepheir) 이 부분부터는 태완이와 함께 작업해야 할 듯
+            if order_classification.startswith('+매수'):
+                pass
+            elif order_classification.startswith('-매도'):
+                pass
+
+        return super()._receive_chejan_data(gubun, item_cnt, fid_list)
+
+
 if __name__ == "__main__":
     with open('config.json', 'r', encoding='utf-8') as f:
         config = json.loads(f.read())
