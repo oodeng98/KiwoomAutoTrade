@@ -8,7 +8,6 @@ import datetime
 import time
 import os
 from data_test import *
-import winsound as sd
 
 TR_REQ_TIME_INTERVAL = 0.2
 
@@ -20,6 +19,7 @@ STANDARD = 10000000
 LIMIT = 5  # 조각의 개수를 제한해줘야 한다, 조각당 백만원은 있어야 할듯
 MONEY = 1000000
 ACCOUNT_NUM = "8000927211"
+
 
 class Kiwoom(QAxWidget):  # 키움증권의 OpenAPI 가 제공하는 메서드를 호출하기 위해서 QAxWidget 클래스의 인스턴스 필요
     def __init__(self):
@@ -144,11 +144,9 @@ class Kiwoom(QAxWidget):  # 키움증권의 OpenAPI 가 제공하는 메서드�
         return ret
 
     def _receive_chejan_data(self, gubun, item_cnt, fid_list):
-        # if gubun == 0:
         order_num = self.get_chejan_data(9203)
         if not order_num:
             return
-        # print("체결", end=' ')
         sCode = self.get_chejan_data(9001)[1:]
         self.stock[sCode].order_num = order_num
         print(self.stock[sCode].order_num, end=' ')  # 주문번호
@@ -171,10 +169,10 @@ class Kiwoom(QAxWidget):  # 키움증권의 OpenAPI 가 제공하는 메서드�
                 # print("가지고 있는 종목 개수: ", len(self.buy_list))
                 # print(self.buy_list)
                 self.stock[sCode].sell_price = find_sell_price(self.stock[sCode].price_time[0], SELL_FACTOR1)
-                time.sleep(0.2)
+                # time.sleep(0.2)
                 self.send_order("send_order_rq", 8020 + len(self.buy_list), ACCOUNT_NUM, 2, sCode,
                                 self.stock[sCode].own_num, self.stock[sCode].sell_price, '00', "")  # 매도 조건1의 위치
-                # print("올려서 매도 주문함")
+                print("+5% 매도주문")
             elif temp == '-매도':
                 try:
                     print(name, "매도 완료")
@@ -298,7 +296,7 @@ class Kiwoom(QAxWidget):  # 키움증권의 OpenAPI 가 제공하는 메서드�
                 self._save_callback()
                 self.event_loop.exit()
             price = max(-price, price)
-            # 만약 남은 거래가 있고, 그 거래의 주문 시간이 지금 시간보다 10초 이상 적을 경우, 그 주문을 취소해버리는 그런 파트가 필요
+            deal = max(-deal, deal)
             # 거래 파트
             # 매도 파트에서는 standard / 10 이상의 금액이 오고가는 거래만 취급한다
             if sCode in self.stock:
@@ -346,17 +344,18 @@ class Kiwoom(QAxWidget):  # 키움증권의 OpenAPI 가 제공하는 메서드�
                         # 미리 검증한 조건에 맞는지 확인
                         if high[0] >= low[0] * (1 + 1 / 100 * BUY_FACTOR) and high[1] > low[1]:  # 매수 조건의 인자
                             self.stock[sCode].own = True
-                            if LIMIT > len(self.buy_list):
+                            if LIMIT >= len(self.buy_list):
                                 order_num = MONEY // price
                                 self.stock[sCode].own_num = order_num  # 매수하고자 하는 개수
                                 self.stock[sCode].not_yet = order_num  # 미체결 개수
                                 beepsound()  # 삐 소리가 나게 함
                                 self.send_order("send_order_rq", 8010 + len(self.buy_list), ACCOUNT_NUM, 1, sCode,
                                                 order_num, 0, '03', "")
-                                print("매수", sCode, clock)
+                                print("매수", sCode, price, find_sell_price(price, 5), find_sell_price(price, -2), clock.minute)
                                 self.stock[sCode].price_time = [price, now * 60 + second]
                             else:
                                 print('보유 주식 개수 초과,', sCode, '구매 불가')
+                                self.stock[sCode].price_time = [price, now * 60 + second]
                         # 사고 난 후 1퍼가 떨어지면 목표를 조금 줄여주는 것이 효율적인가?데이터셋에서 확인해보는 것이 나을듯
                         # 거래량이 파멸적으로 줄어든 종목은 미래가 없다고 가정?
                         # 그 시점에서 팔아버리면?
@@ -568,3 +567,4 @@ if __name__ == "__main__":
 # 파이썬 로거 사용해보기
 # 3시가 되면 보유중인 주식을 싹 팔고 저장만 하는 것이 어떤가?
 # 시장가로 하면 매수 주문이 성사되지 않을 가능성은? 없다면 매수 취소 부분은 제거해도 된다
+# 주문이 안걸리는 경우는 buy_list에는 들어간 종목이 order_num이 없다면?이라는 조건으로 해결 가능할듯
