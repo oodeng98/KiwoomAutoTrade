@@ -6,6 +6,36 @@ import winsound as sd
 from dataclasses import dataclass
 
 
+def data_filter(date, code_lst):
+    con1 = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/" + date + ".db")  # 날짜 데이터도 수정 필요
+    cursor1 = con1.cursor()
+    con2 = sqlite3.connect("c:/Users/ooden/PycharmProjects/pythonProject1/stock_data/" + date + '_filter.db')
+    new_data = {}
+    total_count = 0
+    new_count = 0
+    for k in code_lst:
+        try:
+            cursor1.execute(f"SELECT * FROM '{k}'")
+            temp = cursor1.fetchall()
+            total_count += len(temp)
+            if temp:
+                new_data[k] = {'price': [], 'deal': [], 'clock': []}
+                for i in range(len(temp)):
+                    if temp[i][1] * int(temp[i][2]) >= 10000000:  # 지금 데이터에는 deal이 +, -가 나뉘어져 있다.
+                        # + 데이터만 사용하는 것이 결과값이 더 좋지만 실제로는 어떻게 될지 모르겟음, 조금 더 지켜봐야 알 수 있을듯
+                        # 매수는 천만원 기준으로 하되, 매도는 실시간으로 해주는 것이 덜 손해일 수도 있음, 한번 확인 요망, 프로그램 수정해보기
+                        new_data[k]['price'].append(temp[i][1])
+                        new_data[k]['deal'].append(temp[i][2])
+                        new_data[k]['clock'].append(temp[i][3])
+                new_count += len(new_data[k]['price'])
+        except sqlite3.OperationalError:
+            pass
+    print(total_count, new_count)
+    for i in new_data:
+        df = pd.DataFrame(new_data[i])
+        df.to_sql(i, con2, if_exists='replace')
+        
+        
 # 원래는 구매할 수 있는 종목이 한정적이라 살 수 있는 종목의 개수에 limit 을 걸어야 하지만 이건 검증 과정이므로 생략
 def method1(data):  # 한 시점의 거래량이 그 전 지점에 비해 폭발적으로 늘어나는 경우
     # 이건 누적 데이터를 받아와서 해야할 것 같은데...?
@@ -15,7 +45,6 @@ def method1(data):  # 한 시점의 거래량이 그 전 지점에 비해 폭발
 
 
 def method2(data, time_factor, buy_factor, sell_factor1, sell_factor2):
-    # 지금 main 에 존재하는 것, 2분 내에 3퍼 이상 올라간 종목을 구매, 2퍼가 오르거나 내리면 매도
     # 조건 1, time_factor 분 내의 데이터만 저장해놓는다
     # 조건 2, 구매 후 ???분이 지나면 판다->이건 나중에 구현해봐도 될듯, 일단 기본조건에 맞는 주식들의 비율을 확인할 예정
     # 조건 3, MAX_NUM 의 개수를 넘으면 구매하지 않는다.->이것도 나중에 구현
@@ -53,49 +82,18 @@ def method2(data, time_factor, buy_factor, sell_factor1, sell_factor2):
 # -1은 해당사항 없음, 0은 손해, 1은 이득, 2는 매수는 했지만 매도 조건에는 충족되지 않은 경우
 
 
-def data_filter(date, code_lst):
-    con1 = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/" + date + ".db")  # 날짜 데이터도 수정 필요
-    cursor1 = con1.cursor()
-    con2 = sqlite3.connect("c:/Users/ooden/PycharmProjects/pythonProject1/stock_data/" + date + '_filter.db')
-    new_data = {}
-    total_count = 0
-    new_count = 0
-    for k in code_lst:
-        try:
-            cursor1.execute(f"SELECT * FROM '{k}'")
-            temp = cursor1.fetchall()
-            total_count += len(temp)
-            if temp:
-                new_data[k] = {'price': [], 'deal': [], 'clock': []}
-                for i in range(len(temp)):
-                    if temp[i][1] * int(temp[i][2]) >= 10000000:  # 지금 데이터에는 deal이 +, -가 나뉘어져 있다.
-                        # + 데이터만 사용하는 것이 결과값이 더 좋지만 실제로는 어떻게 될지 모르겟음, 조금 더 지켜봐야 알 수 있을듯
-                        # 매수는 천만원 기준으로 하되, 매도는 실시간으로 해주는 것이 덜 손해일 수도 있음, 한번 확인 요망, 프로그램 수저해보기
-                        new_data[k]['price'].append(temp[i][1])
-                        new_data[k]['deal'].append(temp[i][2])
-                        new_data[k]['clock'].append(temp[i][3])
-                new_count += len(new_data[k]['price'])
-        except sqlite3.OperationalError:
-            pass
-    print(total_count, new_count)
-    for i in new_data:
-        df = pd.DataFrame(new_data[i])
-        df.to_sql(i, con2, if_exists='replace')
-
-
-def method_test(date, code_lst):
+def method2_test(date, code_lst):
     con = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/" + date + "_filter.db")
     # 날짜 데이터를 수정해서 넣어줘야함
     cursor = con.cursor()
-    time_factor_list = tqdm([3, 4, 5, 6, 7, 8, 9, 10])
-    buy_factor_list = [2, 3, 4, 5, 6]
+    time_factor_list = tqdm([3, 4, 5, 6, 7, 8])
+    buy_factor_list = [3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7]
     # time_factor 와 buy_factor 가 같으면 -1의 개수는 같다, 를 이용하면 더 빨리 돌려볼 수 있을 것 같은데?->성공
     # buy_factor 가 증가하면 -1의 개수도 증가함
     # 원래 대략 126초정도 걸림->처음엔 46초, 그 이후에는 20초대에서 처리가능
-    sell_factor1_list = [1, 2, 3, 4, 5]
-    sell_factor2_list = [1, 2, 3]
+    sell_factor1_list = [2, 2.5, 3, 3.5, 4, 4.5, 5]
+    sell_factor2_list = [1, 1.5, 2, 2.5]
     total_data = []
-    total_data2 = []
     for q in time_factor_list:
         minus_one_list = {}
         for w in buy_factor_list:
@@ -115,37 +113,127 @@ def method_test(date, code_lst):
                             pass
                     total_data.append([q, w, e, r, count_list[-1], count_list[0], count_list[1], count_list[2],
                                        e * count_list[1] - r * count_list[0] - r * 0.8 * count_list[2]
-                                       - 0.33 * (count_list[0] + count_list[1] + count_list[2])])
-                    total_data2.append([q, w, e, r, count_list[-1], count_list[0], count_list[1], count_list[2],
+                                       - 0.33 * (count_list[0] + count_list[1] + count_list[2]),
                                        e * count_list[1] - r * count_list[0] - r * 0.8 * count_list[2]
                                        - 0.68 * (count_list[0] + count_list[1] + count_list[2])])
-                    # print(f"{q}, {w}, {e}, {r}, {count_list}")
     con2 = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/method_test.db")
     df = pd.DataFrame(total_data, columns=['time', 'buy', 'up_sell', 'down_sell', 'none', 'loss', 'benefit', 'timeout',
-                                           'score'])
+                                           'score', 'simulate_score'])
+    df.to_sql(date, con2, if_exists='replace')
+
+
+def method3(data, time_factor, buy_factor, sell_factor1, sell_factor2):
+    # method2를 사용해서 하루에 최대 이익을 얼마나 볼 수 있는지 그래프로 나타낼 예정
+    # 베이스는 method2를 그대로 사용
+    price_time = []
+    buy_price = 0
+    for i in range(len(data)):
+        index, price, deal, time = data[i]
+        price = eval(price)
+        price = max(price, -price)
+        time = int(time[11:13]) * 60 + int(time[14:16])
+        if not buy_price:
+            price_time.append((price, time))
+
+            while price_time[0][1] < time - time_factor:  # 조건 1의 인자 위치
+                del price_time[0]
+
+            high = max(price_time, key=lambda x: x[0])
+            low = min(price_time, key=lambda x: x[0])
+
+            if high[0] >= low[0] * (1 + 1 / 100 * buy_factor) and high[1] > low[1]:  # 매수 조건의 인자
+                price_time = [(price, time)]
+                buy_price = price
+        else:  # 매도 조건의 인자들 + 조건 4
+            if buy_price * (1 + 1 / 100 * sell_factor1) <= price:
+                return 1, time
+            elif price <= buy_price * (1 - 1 / 100 * sell_factor2):
+                return 0, time
+    if buy_price:
+        return 2
+    return -1
+
+
+def method3_test(date, code_lst):
+    con = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/" + date + "_filter.db")
+    # 날짜 데이터를 수정해서 넣어줘야함
+    cursor = con.cursor()
+    time_factor_list = tqdm([3, 4, 5, 6, 7, 8])
+    buy_factor_list = [3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7]
+    # time_factor 와 buy_factor 가 같으면 -1의 개수는 같다, 를 이용하면 더 빨리 돌려볼 수 있을 것 같은데?->성공
+    # buy_factor 가 증가하면 -1의 개수도 증가함
+    # 원래 대략 126초정도 걸림->처음엔 46초, 그 이후에는 20초대에서 처리가능
+    sell_factor1_list = [2, 2.5, 3, 3.5, 4, 4.5, 5]
+    sell_factor2_list = [1, 1.5, 2, 2.5]
+    total_data = []
+    for q in time_factor_list:
+        minus_one_list = {}
+        for w in buy_factor_list:
+            count_list = {-1: len(minus_one_list), 0: 0, 1: 0, 2: 0}
+            for e in sell_factor1_list:
+                for r in sell_factor2_list:
+                    count_list[0] = 0
+                    count_list[1] = 0
+                    count_list[2] = 0
+                    check_time_element = []
+                    for k in code_lst:
+                        try:
+                            if k not in minus_one_list:
+                                cursor.execute(f"SELECT * FROM '{k}'")
+                                temp = np.array(cursor.fetchall())  # index, price, deal, clock
+                                result = method3(temp, q, w, e, r)  # method position
+                                if type(result) is tuple:
+                                    count_list[result[0]] += 1
+                                    check_time_element.append(result)
+                                else:
+                                    count_list[result] += 1
+                                    if result == -1:
+                                        minus_one_list[k] = 0
+                        except sqlite3.OperationalError:
+                            pass
+                    check_time_element.sort(key=lambda x: x[1])
+                    temp = []
+                    for i in check_time_element:
+                        if not temp:
+                            if i[0] == 1:
+                                temp.append(e)
+                            else:
+                                temp.append(r)
+                        else:
+                            temp_temp = temp[-1]
+                            if i[0] == 1:
+                                temp.append(temp_temp + e)
+                            else:
+                                temp.append(temp_temp - r)
+
+                    total_data.append([q, w, e, r, count_list[-1], count_list[0], count_list[1], count_list[2],
+                                       e * count_list[1] - r * count_list[0] - r * 0.8 * count_list[2]
+                                       - 0.33 * (count_list[0] + count_list[1] + count_list[2]), max(temp) - temp.index(max(temp)) * 0.33,
+                                       check_time_element[temp.index(max(temp)) - 1][1], temp[-1]])
+    con2 = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/new_method_test.db")
+    df = pd.DataFrame(total_data, columns=['time', 'buy', 'up_sell', 'down_sell', 'none', 'loss', 'benefit', 'timeout',
+                                           'score', 'high_score', 'real_time', 'testing'])
     # print(df)
     df.to_sql(date, con2, if_exists='replace')
-    df2 = pd.DataFrame(total_data2, columns=['time', 'buy', 'up_sell', 'down_sell', 'none', 'loss', 'benefit',
-                                             'timeout', 'score'])
-    df2.to_sql(date + '_simulate', con2, if_exists='replace')
 
 
+# 다 쓰고 원래대로 돌려주셈
 def view_total_data():
-    con = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/method_test.db")
+    con = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/new_method_test.db")
     cursor = con.cursor()
-    date = ["2021-06-30", "2021-07-01", "2021-07-02", "2021-07-19", "2021-07-20"]
+    date = ["2021-07-19", "2021-07-22", "2021-07-26"]
     # 이 부분은 수기로 추가해줘야함, 텍스트 파일로 저장해도 무관한데 이부분은
     data = []
     for i in date:
         cursor.execute(f"SELECT * FROM '{i}'")
         data.append(cursor.fetchall())
     result = []
-    for i in range(600):
+    for i in range(1512):
         temp = data[0][i]
         score = 0
         for j in range(len(date)):
-            score += data[j][i][-1]
-        temp_lst = [temp[1], temp[2], temp[3], temp[4], score]
+            score += data[j][i][-3]
+        temp_lst = [temp[1], temp[2], temp[3], temp[4], round(score / len(date), 2)]
         result.append(temp_lst)
     df = pd.DataFrame(result, columns=['time', 'buy', 'up_sell', 'down_sell', 'score'])
     df.to_sql("Score", con, if_exists='replace')
@@ -154,19 +242,20 @@ def view_total_data():
 def view_total_data_simulate():
     con = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/method_test.db")
     cursor = con.cursor()
-    date = ["2021-06-30_simulate", "2021-07-01_simulate", "2021-07-02_simulate", "2021-07-19_simulate", "2021-07-20_simulate"]
+    date = ["2021-07-19_simulate",
+            "2021-07-22_simulate", "2021-07-26_simulate"]
     # 이 부분은 수기로 추가해줘야함, 텍스트 파일로 저장해도 무관한데 이부분은
     data = []
     for i in date:
         cursor.execute(f"SELECT * FROM '{i}'")
         data.append(cursor.fetchall())
     result = []
-    for i in range(600):
+    for i in range(1512):
         temp = data[0][i]
         score = 0
         for j in range(len(date)):
             score += data[j][i][-1]
-        temp_lst = [temp[1], temp[2], temp[3], temp[4], score]
+        temp_lst = [temp[1], temp[2], temp[3], temp[4], round(score / len(date) / 5, 2)]
         result.append(temp_lst)
     df = pd.DataFrame(result, columns=['time', 'buy', 'up_sell', 'down_sell', 'score'])
     df.to_sql("Score_simulate", con, if_exists='replace')
@@ -184,7 +273,7 @@ def find_sell_price(price, sell_factor2):
             standard = i // 1000
             break
     sell_price = (sell_price // standard - 1) * standard
-    return sell_price
+    return int(sell_price)
 
 
 def beepsound():
@@ -306,14 +395,18 @@ if __name__ == "__main__":
                  '350520', '352820', '353200', '35320K', '357120', '357250', '361610', '363280', '36328K', '365550',
                  '375500', '37550K', '378850', '380440', '383220', '383800', '38380K', '385590', '385600', '385710',
                  '385720', '950210', '900140']
-    today = "2021-07-20"
+    # "2021-06-30", "2021-07-01", "2021-07-02",  # 데이터가 너무 좋은 값으로 나와서 일단 제외
+    todays = ["2021-07-19", "2021-07-22", "2021-07-26"]
+    for today in todays:
+        method3_test(today, code_list)
     # data_filter(today, code_list)
     # print("데이터 filtering 끝")
-    method_test(today, code_list)
-    print("method test 끝")
+    # today = "2021-07-19"
+
+    # print(today)
     view_total_data()
-    view_total_data_simulate()
-    print("데이터 병합 끝")
+    # view_total_data_simulate()
+    # print("데이터 병합 끝")
     # print(find_sell_price(8270, 5))
     # 날짜별로 폴더를 따로 만들어줘야할 것 같은데, 폴더도 자동생성이 가능한가?
     # 가능은 한데 아직은 굳이
