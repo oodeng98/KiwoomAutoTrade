@@ -54,6 +54,7 @@ class KiwoomOpenAPI:
 
         self.OCXconn.OnReceiveTrData.connect(self.OnReceiveTrData)
 
+    # 1)
     def CommConnect(self) -> int:
         """로그인 윈도우를 실행한다.
 
@@ -65,6 +66,7 @@ class KiwoomOpenAPI:
         """
         return self.OCXconn.dynamicCall("CommConnect()")
 
+    # 2)
     def CommTerminate(self) -> None:
         """더 이상 지원하지 않는 함수
 
@@ -73,6 +75,7 @@ class KiwoomOpenAPI:
         warn('이 함수는 더 이상 지원되지 않습니다.')
         return None
 
+    # 3)
     def CommRqData(self,
                    sRQName: str,
                    sTrCode: str,
@@ -99,8 +102,10 @@ class KiwoomOpenAPI:
             sRQName,
             sTrCode,
             nPrevNext,
-            sScreenNo)
+            sScreenNo
+        )
 
+    # 4)
     def GetLoginInfo(self, sTag: str) -> str:
         """로그인한 사용자 정보를 반환한다.
 
@@ -122,8 +127,10 @@ class KiwoomOpenAPI:
         """
         return self.OCXconn.dynamicCall(
             "GetLoginInfo(QString)",
-            sTag)
+            sTag
+        )
 
+    # 9)
     def CommGetData(self, *args, **kwargs) -> str:
         """이 함수는 지원하지 않을 것이므로 용도에 맞는 전용 함수를 사용할 것
 
@@ -136,7 +143,8 @@ class KiwoomOpenAPI:
         return self.OCXconn.dynamicCall(
             "CommGetData()",
             *args,
-            **kwargs)
+            **kwargs
+        )
 
     # 25)
     def GetCommRealData(self, strCode: str, nFid: int) -> str:
@@ -155,7 +163,9 @@ class KiwoomOpenAPI:
         return self.OCXconn.dynamicCall(
             "GetCommRealData(QString, int)",
             strCode,
-            nFid).strip()
+            nFid
+        ).strip()
+
 
     # OpenAPI 컨트롤 이벤트
 
