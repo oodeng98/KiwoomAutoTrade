@@ -166,6 +166,23 @@ class KiwoomOpenAPI:
             nFid
         ).strip()
 
+    # 26)
+    def GetChejanData(self, nFid:int) -> str:
+        """체결잔고 데이터를 반환한다.
+
+        Ex) 현재가출력 – `openApi.GetChejanData(10)`
+
+        Args:
+            nFid: (long) 체결잔고 아이템
+
+        Returns:
+            수신 데이터
+        """
+        return self.OCXconn.dynamicCall(
+            "GetChejanData(int)",
+            nFid
+        ).strip()
+
 
     # OpenAPI 컨트롤 이벤트
 
