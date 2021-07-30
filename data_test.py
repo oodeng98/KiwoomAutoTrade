@@ -47,7 +47,7 @@ def method1(data):  # 한 시점의 거래량이 그 전 지점에 비해 폭발
 def method2(data, time_factor, buy_factor, sell_factor1, sell_factor2):
     # 조건 1, time_factor 분 내의 데이터만 저장해놓는다
     # 조건 2, 구매 후 ???분이 지나면 판다->이건 나중에 구현해봐도 될듯, 일단 기본조건에 맞는 주식들의 비율을 확인할 예정
-    # 조건 3, MAX_NUM 의 개수를 넘으면 구매하지 않는다.->이것도 나중에 구현
+    # 조건 3, MAX_NUM 의 개수를 넘으면 구매하지 않는다.
     # 조건 4, 이미 구매했던 종목은 구매하지 않는다
     # 조건 5, buy_factor 만큼 주가 상승한 종목을 구매한다
     # 조건 6, sell_factor1만큼 주가가 상승하거나, sell_factor2만큼 주가가 하락하면 매도한다
@@ -80,6 +80,7 @@ def method2(data, time_factor, buy_factor, sell_factor1, sell_factor2):
     return -1
 # time_factor, buy_factor, sell_factor1, sell_factor2
 # -1은 해당사항 없음, 0은 손해, 1은 이득, 2는 매수는 했지만 매도 조건에는 충족되지 않은 경우
+# 주가로 하지 말고 거래량으로 매도조건을 걸어볼까?
 
 
 def method2_test(date, code_lst):
@@ -87,7 +88,7 @@ def method2_test(date, code_lst):
     # 날짜 데이터를 수정해서 넣어줘야함
     cursor = con.cursor()
     time_factor_list = tqdm([3, 4, 5, 6, 7, 8])
-    buy_factor_list = [3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7]
+    buy_factor_list = [3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8]
     # time_factor 와 buy_factor 가 같으면 -1의 개수는 같다, 를 이용하면 더 빨리 돌려볼 수 있을 것 같은데?->성공
     # buy_factor 가 증가하면 -1의 개수도 증가함
     # 원래 대략 126초정도 걸림->처음엔 46초, 그 이후에는 20초대에서 처리가능
@@ -97,9 +98,10 @@ def method2_test(date, code_lst):
     for q in time_factor_list:
         minus_one_list = {}
         for w in buy_factor_list:
+            count_list = {-1: len(minus_one_list), 0: 0, 1: 0, 2: 0}
             for e in sell_factor1_list:
                 for r in sell_factor2_list:
-                    count_list = {-1: len(minus_one_list), 0: 0, 1: 0, 2: 0}
+                    count_list[0], count_list[1], count_list[2] = 0, 0, 0
                     for k in code_lst:
                         try:
                             if k not in minus_one_list:
@@ -115,7 +117,7 @@ def method2_test(date, code_lst):
                                        e * count_list[1] - r * count_list[0] - r * 0.8 * count_list[2]
                                        - 0.33 * (count_list[0] + count_list[1] + count_list[2]),
                                        e * count_list[1] - r * count_list[0] - r * 0.8 * count_list[2]
-                                       - 0.68 * (count_list[0] + count_list[1] + count_list[2])])
+                                       - 0.65 * (count_list[0] + count_list[1] + count_list[2])])
     con2 = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/method_test.db")
     df = pd.DataFrame(total_data, columns=['time', 'buy', 'up_sell', 'down_sell', 'none', 'loss', 'benefit', 'timeout',
                                            'score', 'simulate_score'])
@@ -172,9 +174,7 @@ def method3_test(date, code_lst):
             count_list = {-1: len(minus_one_list), 0: 0, 1: 0, 2: 0}
             for e in sell_factor1_list:
                 for r in sell_factor2_list:
-                    count_list[0] = 0
-                    count_list[1] = 0
-                    count_list[2] = 0
+                    count_list[0], count_list[1], count_list[2] = 0, 0, 0
                     check_time_element = []
                     for k in code_lst:
                         try:
@@ -219,31 +219,11 @@ def method3_test(date, code_lst):
 
 # 다 쓰고 원래대로 돌려주셈
 def view_total_data():
-    con = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/new_method_test.db")
-    cursor = con.cursor()
-    date = ["2021-07-19", "2021-07-22", "2021-07-26"]
-    # 이 부분은 수기로 추가해줘야함, 텍스트 파일로 저장해도 무관한데 이부분은
-    data = []
-    for i in date:
-        cursor.execute(f"SELECT * FROM '{i}'")
-        data.append(cursor.fetchall())
-    result = []
-    for i in range(1512):
-        temp = data[0][i]
-        score = 0
-        for j in range(len(date)):
-            score += data[j][i][-3]
-        temp_lst = [temp[1], temp[2], temp[3], temp[4], round(score / len(date), 2)]
-        result.append(temp_lst)
-    df = pd.DataFrame(result, columns=['time', 'buy', 'up_sell', 'down_sell', 'score'])
-    df.to_sql("Score", con, if_exists='replace')
-
-
-def view_total_data_simulate():
     con = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/method_test.db")
     cursor = con.cursor()
-    date = ["2021-07-19_simulate",
-            "2021-07-22_simulate", "2021-07-26_simulate"]
+    # "2021-06-30", "2021-07-01", "2021-07-02",
+    date = ["2021-07-19", "2021-07-22", "2021-07-26", "2021-07-27"]
+    date2 = ["2021-07-28", "2021-07-29", "2021-07-30"]
     # 이 부분은 수기로 추가해줘야함, 텍스트 파일로 저장해도 무관한데 이부분은
     data = []
     for i in date:
@@ -255,10 +235,12 @@ def view_total_data_simulate():
         score = 0
         for j in range(len(date)):
             score += data[j][i][-1]
-        temp_lst = [temp[1], temp[2], temp[3], temp[4], round(score / len(date) / 5, 2)]
+        for j in range(len(date2)):
+            score += data[j][i][-2]
+        temp_lst = [temp[1], temp[2], temp[3], temp[4], round(score / len(date), 2)]
         result.append(temp_lst)
     df = pd.DataFrame(result, columns=['time', 'buy', 'up_sell', 'down_sell', 'score'])
-    df.to_sql("Score_simulate", con, if_exists='replace')
+    df.to_sql("Score", con, if_exists='replace')
 
 
 def find_sell_price(price, sell_factor2):
@@ -290,10 +272,6 @@ class Stock:
     own: bool = False
     undo: bool = False
     after_trade: bool = False
-# 1, 매수가 순조롭게 이뤄지고 이득보고 매도한 경우 V
-# 2, 매수가 순조롭게 이뤄지고 손해보고 매도한 경우 V
-# 3, 매수가 순조롭게 이뤄지지 않고 이득보고 매도한 경우
-# 3, 매수가 순조롭게 이뤄지지 않고 손해보고 매도한 경우
 
 
 # '002420', '003280', '003620', '007630', '010580', '011300', '011690', '012600',
@@ -396,17 +374,16 @@ if __name__ == "__main__":
                  '375500', '37550K', '378850', '380440', '383220', '383800', '38380K', '385590', '385600', '385710',
                  '385720', '950210', '900140']
     # "2021-06-30", "2021-07-01", "2021-07-02",  # 데이터가 너무 좋은 값으로 나와서 일단 제외
-    todays = ["2021-07-19", "2021-07-22", "2021-07-26"]
-    for today in todays:
-        method3_test(today, code_list)
+    todays = ["2021-06-30", "2021-07-01", "2021-07-02"]
+    today = "2021-07-30"
+    method3_test(today, code_list)
+    # for today in todays:
+    #     method3_test(today, code_list)
     # data_filter(today, code_list)
     # print("데이터 filtering 끝")
-    # today = "2021-07-19"
 
     # print(today)
     view_total_data()
-    # view_total_data_simulate()
     # print("데이터 병합 끝")
-    # print(find_sell_price(8270, 5))
     # 날짜별로 폴더를 따로 만들어줘야할 것 같은데, 폴더도 자동생성이 가능한가?
     # 가능은 한데 아직은 굳이
