@@ -1,4 +1,5 @@
 import sys
+from typing import Dict, List
 from PyQt5.QtWidgets import *
 from PyQt5.QAxContainer import *
 from PyQt5.QtCore import *
@@ -9,15 +10,15 @@ import time
 import os
 from data_test import *
 
-TR_REQ_TIME_INTERVAL = 0.2
+TR_REQ_TIME_INTERVAL = 0.2 # receive real data는 시간과 상관없이... (0.2초 안에 내 정보를 2번이상 요청시 프로그램이 강제 종료되는 오류 방지용)
 
-TIME_FACTOR = 6
-BUY_FACTOR = 5
-SELL_FACTOR1 = 5
-SELL_FACTOR2 = 2
-STANDARD = 10000000
+TIME_FACTOR = 6 # 주식 살 때, 6분안에 (이어서)
+BUY_FACTOR = 5 # 5% 오르면 사겠다
+SELL_FACTOR1 = 5 # 5% 오르면 팔겠다
+SELL_FACTOR2 = 2 # 2% 내리면 팔겠다
+STANDARD = 10000000 # 최소 체결가
 LIMIT = 5  # 조각의 개수를 제한해줘야 한다, 조각당 백만원은 있어야 할듯
-MONEY = 1000000
+MONEY = 1000000 # 조각(종목당 투자 상한선) 당 가격
 ACCOUNT_NUM = "8000927211"
 
 
@@ -33,8 +34,8 @@ class Kiwoom(QAxWidget):  # 키움증권의 OpenAPI 가 제공하는 메서드�
         self._create_kiwoom_instance()
         self._set_signal_slots()
         self.con = sqlite3.connect("c:/Users/ooden/PycharmProjects/pythonProject1/stock_data/" + self.today + '.db')
-        self.stock = {}
-        self.buy_list = []
+        self.stock: Dict[str, Stock] = {}
+        self.buy_list: List[str] = [] # 내가 소유중인 종목코드의 리스트
 
     def _create_kiwoom_instance(self):  # _를 붙여준 이유는 이 메서드가 주로 Kiwoom 메서드에서 호출되기 때문
         self.setControl("KHOPENAPI.KHOpenAPICtrl.1")  # 무슨 역할인지 모르겠음
@@ -145,8 +146,10 @@ class Kiwoom(QAxWidget):  # 키움증권의 OpenAPI 가 제공하는 메서드�
 
     def _receive_chejan_data(self, gubun, item_cnt, fid_list):
         order_num = self.get_chejan_data(9203)
+
         if not order_num:
             return
+
         sCode = self.get_chejan_data(9001)[1:]
         self.stock[sCode].order_num = order_num
         print(self.stock[sCode].order_num, end=' ')  # 주문번호
@@ -298,19 +301,42 @@ class Kiwoom(QAxWidget):  # 키움증권의 OpenAPI 가 제공하는 메서드�
             price = max(-price, price)
             deal = max(-deal, deal)
             # 거래 파트
+
             # 매도 파트에서는 standard / 10 이상의 금액이 오고가는 거래만 취급한다
+
+            ################################
+            # 이미 매입조건을 만족하여 내가 구매한 이력이 있는
+            # 종목은 쳐다보지도 않음.
+            #
+            # 그렇지 않다면, 시장의 가격 변동 동향을 보기위한 Stock 객체를 준비함
+            ################################
             if sCode in self.stock:
                 if self.stock[sCode].after_trade:
                     return
             else:
                 self.stock[sCode] = Stock(price_time=[])
+
+
+            ################################
+            # STD의 10%도 미치지 못하면 쳐다보지 않음
+            ###############################
             if price * deal >= STANDARD / 10:
                 now = hour * 60 + minute  # now 는 시간을 분으로 바꿔놓은 것, ex)11시 30의 now = 690
                 second = clock.second
+                ################################
+                # 내가 가진 종목이면 주문 취소 검토
+                # 아니라면 구매 주문 검토
+                #
+                # own과 after_trade의 차이는, own은 주식을 팔거나 주문 취소시 사라짐
+                # 단, after_trade는 오직 조건을 만족하여 판 경우만 활성화됨
+                ###############################
                 if self.stock[sCode].own:
                     # 20초가 지났음에도 미체결수량이 0이 아니면 남은 수량 주문취소
                     if (self.stock[sCode].price_time[1] + 10) < (now * 60 + second)\
                             and self.stock[sCode].not_yet != 0 and sCode not in self.buy_list:
+                        ################################
+                        # 매수 취소 시작
+                        ################################
                         self.stock[sCode].own_num = self.stock[sCode].own_num - self.stock[sCode].not_yet
                         if self.stock[sCode].own_num == 0:
                             self.stock[sCode].after_trade = True
@@ -319,8 +345,17 @@ class Kiwoom(QAxWidget):  # 키움증권의 OpenAPI 가 제공하는 메서드�
                         self.stock[sCode].not_yet = 0
                         self.send_order("send_order_rq", 8010, ACCOUNT_NUM, 3, sCode, temp, 0, '03',
                                         self.stock[sCode].order_num)
+                        ################################
+                        # 매수 취소 끝
+                        ################################
+
                         # 과열 종목이라 매수 취소가 아예 안먹는 경우가 있다, 어떻게 해결해야할까
                     if sCode in self.buy_list:
+                        ################################
+                        # ???????
+                        # buy_price가 원래는 Tuple[int, int]였으나,
+                        # 이 아래 else문에서 "미리 검증한 조건에 맞는지 확인" 부분에서 수습되어 올라온 부분 이다.
+                        ################################
                         buy_price = self.stock[sCode].price_time[0]
                         if price <= buy_price * (1 - 1 / 100 * SELL_FACTOR2):  # 매도 조건2의 위치
                             self.stock[sCode].undo = True
@@ -330,6 +365,9 @@ class Kiwoom(QAxWidget):  # 키움증권의 OpenAPI 가 제공하는 메서드�
                                             self.stock[sCode].own_num, 0, '03', "")
                             print(sCode, "손해 매도 주문", clock, "걸린 시간: " +
                                   str(now - self.stock[sCode].price_time[1] // 60) + "분")
+                        ################################
+                        # ???????
+                        ################################
                             # 손해를 보자마자 파는게 아니라 손해 1퍼를 찍고 나면 기댓값을 반으로 줄여서 돌려보는게 어떤가 싶기는 한데
                 else:  # 한번 거래했던 종목은 다시 매수하지 않음
                     # deal 데이터 중 -데이터를 솎아내고 STANDARD 이상의 거래 금액을 가진 데이터만 사용함
@@ -339,16 +377,36 @@ class Kiwoom(QAxWidget):  # 키움증권의 OpenAPI 가 제공하는 메서드�
                         while self.stock[sCode].price_time[0][1] < now - TIME_FACTOR:  # time_factor 의 위치
                             del self.stock[sCode].price_time[0]
                         # 만약 가진 종목이 LIMIT 에 도달한 경우, 더이상은 사지 않는다
+
+                        ################################
+                        # 구매가? 기준으로 최대/최소가를 뽑음
+                        # -> 그럼 구매가/시간들은 내가 구매한게 아니어도 그냥 죄다 기록해두는건가? o
+                        # 그럼 특정 구간이 stock[sCode]에 기록이 되고, 해당 구간에서 최대최저가 구간을 뽑아
+                        # 구매 조건을 보는데 활용하는 듯 보임.
+                        ################################
                         high = max(self.stock[sCode].price_time, key=lambda x: x[0])
                         low = min(self.stock[sCode].price_time, key=lambda x: x[0])
                         # 미리 검증한 조건에 맞는지 확인
                         if high[0] >= low[0] * (1 + 1 / 100 * BUY_FACTOR) and high[1] > low[1]:  # 매수 조건의 인자
+                            ################################
+                            # 여기서 .own을 True로 바꾸는 것은
+                            # 내가 곧 이 종목을 매수 할 것임을 의미.
+                            # 점 찍는다고 볼 수 있지 않을까
+                            ################################
                             self.stock[sCode].own = True
                             if LIMIT >= len(self.buy_list):
+                                ################################
+                                # 구매 주문을 올림
+                                # <신규매수, 시장가, >
+                                # quantity: order_num       <- 주 수량은 내가 가진 자본/체결가로 자동 책정
+                                # price: 0                  <- 가격은 자동으로 책정하도록 함
+                                #                               (Hoga를 "03"으로 지정했으므로, 시장가 사용)
+                                ################################
                                 order_num = MONEY // price
                                 self.stock[sCode].own_num = order_num  # 매수하고자 하는 개수
                                 self.stock[sCode].not_yet = order_num  # 미체결 개수
                                 beepsound()  # 삐 소리가 나게 함
+
                                 self.send_order("send_order_rq", 8010 + len(self.buy_list), ACCOUNT_NUM, 1, sCode,
                                                 order_num, 0, '03', "")
                                 print("매수", sCode, price, find_sell_price(price, 5), find_sell_price(price, -2), clock.minute)

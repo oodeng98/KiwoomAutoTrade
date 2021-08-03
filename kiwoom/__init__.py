@@ -64,7 +64,7 @@ class KiwoomOpenAPI:
         Returns:
             0 - 성공, 음수값은 실패
         """
-        return self.OCXconn.dynamicCall("CommConnect()")
+        return int(self.OCXconn.dynamicCall("CommConnect()"))
 
     # 2)
     def CommTerminate(self) -> None:
@@ -97,13 +97,13 @@ class KiwoomOpenAPI:
             -   `OP_ERR_RQ_STRING_FAIL` – 요청전문 작성 실패
             -   `OP_ERR_NONE` – 정상처리
         """
-        return self.OCXconn.dynamicCall(
+        return int(self.OCXconn.dynamicCall(
             "CommRqData(QString, QString, int, QString)",
             sRQName,
             sTrCode,
             nPrevNext,
             sScreenNo
-        )
+        ))
 
     # 4)
     def GetLoginInfo(self, sTag: str) -> str:
@@ -130,6 +130,62 @@ class KiwoomOpenAPI:
             sTag
         )
 
+    # 5)
+    def SendOrder(self,
+                  sRQName: str,
+                  sScreenNo: str,
+                  sAccNo: str,
+                  nOrderType: int,
+                  sCode: str,
+                  nQty: int,
+                  nPrice: int,
+                  sHogaGb: str,
+                  sOrgOrderNo: str) -> int:
+        """주식 주문을 서버로 전송한다.
+
+        sHogaGb
+            00:지정가,
+            03:시장가,
+            05:조건부지정가,
+            06:최유리지정가,
+            07:최우선지정가,
+            10:지정가IOC,
+            13:시장가IOC,
+            16:최유리IOC,
+            20:지정가FOK,
+            23:시장가FOK,
+            26:최유리FOK,
+            61:장전시간외종가,
+            62:시간외단일가,
+            81:장후시간외종가
+
+        ※ 시장가, 최유리지정가, 최우선지정가, 시장가IOC, 최유리IOC, 시장가FOK, 최유리FOK, 장전시간외, 장후시간외 주문시 주문가격을 입력하지 않습니다.
+
+        ex)
+            지정가 매수 - openApi.SendOrder(“RQ_1”, “0101”, “5015123410”, 1, “000660”, 10, 48500, “00”, “”);
+            시장가 매수 - openApi.SendOrder(“RQ_1”, “0101”, “5015123410”, 1, “000660”, 10, 0, “03”, “”);
+            매수 정정 - openApi.SendOrder(“RQ_1”,“0101”, “5015123410”, 5, “000660”, 10, 49500, “00”, “1”);
+            매수 취소 - openApi.SendOrder(“RQ_1”, “0101”, “5015123410”, 3, “000660”, 10, 0, “00”, “2”);
+
+        Args:
+            sRQName: (BSTR) 사용자 구분 요청 명
+            sScreenNo: (BSTR) 화면번호[4]
+            sAccNo: (BSTR) 계좌번호[10]
+            nOrderType: (LONG) 주문유형 (1:신규매수, 2:신규매도, 3:매수취소, 4:매도취소, 5:매수정정, 6:매도정정)
+            sCode: (BSTR) 주식종목코드
+            nQty: (LONG) 주문수량
+            nPrice: (LONG) 주문단가
+            sHogaGb: (BSTR) 거래구분
+            sOrgOrderNo: (BSTR) 원주문번호
+
+        Returns:
+            (LONG) 에러코드 (4.에러코드표 참고)
+        """
+        return int(self.OCXconn.dynamicCall(
+            "SendOrder(QString, QString, QString, int, QString, int, int, QString, QString)",
+            [sRQName, sScreenNo, sAccNo, nOrderType, sCode, nQty, nPrice, sHogaGb, sOrgOrderNo]
+        ))
+
     # 9)
     def CommGetData(self, *args, **kwargs) -> str:
         """이 함수는 지원하지 않을 것이므로 용도에 맞는 전용 함수를 사용할 것
@@ -145,6 +201,19 @@ class KiwoomOpenAPI:
             *args,
             **kwargs
         )
+
+    # 16)
+    def GetMasterCodeName(self, strCode: str) -> str:
+        """종목코드의 한글명을 반환한다.
+
+        장내외, 지수선옵, 주식선옵 검색 가능.
+
+        Args:
+            strCode: (LPCTSTR) 종목코드
+        Returns:
+            (BSTR) 종목한글명
+        """
+        return self.OCXconn.dynamicCall("GetMasterCodeName(QString)", strCode)
 
     # 25)
     def GetCommRealData(self, strCode: str, nFid: int) -> str:
@@ -167,7 +236,7 @@ class KiwoomOpenAPI:
         ).strip()
 
     # 26)
-    def GetChejanData(self, nFid:int) -> str:
+    def GetChejanData(self, nFid: int) -> str:
         """체결잔고 데이터를 반환한다.
 
         Ex) 현재가출력 – `openApi.GetChejanData(10)`
@@ -182,7 +251,6 @@ class KiwoomOpenAPI:
             "GetChejanData(int)",
             nFid
         ).strip()
-
 
     # OpenAPI 컨트롤 이벤트
 
