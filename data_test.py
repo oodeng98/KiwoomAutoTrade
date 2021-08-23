@@ -4,6 +4,7 @@ from tqdm import tqdm
 import numpy as np
 import winsound as sd
 from dataclasses import dataclass
+import matplotlib.pyplot as plt
 
 
 def data_filter(date, code_lst):
@@ -160,7 +161,7 @@ def method3_test(date, code_lst):
     con = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/" + date + "_filter.db")
     # 날짜 데이터를 수정해서 넣어줘야함
     cursor = con.cursor()
-    time_factor_list = tqdm([3, 4, 5, 6, 7, 8])
+    time_factor_list = tqdm([1, 2, 3, 4, 5, 6, 7, 8])
     buy_factor_list = [3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7]
     # time_factor 와 buy_factor 가 같으면 -1의 개수는 같다, 를 이용하면 더 빨리 돌려볼 수 있을 것 같은데?->성공
     # buy_factor 가 증가하면 -1의 개수도 증가함
@@ -205,42 +206,41 @@ def method3_test(date, code_lst):
                                 temp.append(temp_temp + e)
                             else:
                                 temp.append(temp_temp - r)
-
+                    if not temp:
+                        temp = [0.33]
                     total_data.append([q, w, e, r, count_list[-1], count_list[0], count_list[1], count_list[2],
                                        e * count_list[1] - r * count_list[0] - r * 0.8 * count_list[2]
-                                       - 0.33 * (count_list[0] + count_list[1] + count_list[2]), max(temp) - temp.index(max(temp)) * 0.33,
-                                       check_time_element[temp.index(max(temp)) - 1][1], temp[-1]])
+                                       - 0.33 * (count_list[0] + count_list[1] + count_list[2]),
+                                       max(temp) - (temp.index(max(temp)) + 1) * 0.33,
+                                       min(temp) - (temp.index(min(temp)) + 1) * 0.33])
     con2 = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/new_method_test.db")
     df = pd.DataFrame(total_data, columns=['time', 'buy', 'up_sell', 'down_sell', 'none', 'loss', 'benefit', 'timeout',
-                                           'score', 'high_score', 'real_time', 'testing'])
+                                           'score', 'high_score', 'low_score'])
     # print(df)
     df.to_sql(date, con2, if_exists='replace')
 
 
 # 다 쓰고 원래대로 돌려주셈
-def view_total_data():
-    con = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/method_test.db")
+def view_total_data(date):
+    con = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/new_method_test.db")
     cursor = con.cursor()
-    # "2021-06-30", "2021-07-01", "2021-07-02",
-    date = ["2021-07-19", "2021-07-22", "2021-07-26", "2021-07-27"]
-    date2 = ["2021-07-28", "2021-07-29", "2021-07-30"]
     # 이 부분은 수기로 추가해줘야함, 텍스트 파일로 저장해도 무관한데 이부분은
     data = []
     for i in date:
         cursor.execute(f"SELECT * FROM '{i}'")
         data.append(cursor.fetchall())
     result = []
-    for i in range(1512):
+    for i in range(2016):
         temp = data[0][i]
+        high_score = 0
         score = 0
         for j in range(len(date)):
-            score += data[j][i][-1]
-        for j in range(len(date2)):
-            score += data[j][i][-2]
-        temp_lst = [temp[1], temp[2], temp[3], temp[4], round(score / len(date), 2)]
+            high_score += data[j][i][-2]
+            score += data[j][i][-3]
+        temp_lst = [temp[1], temp[2], temp[3], temp[4], round(high_score / len(date), 2), round(score / len(date), 2)]
         result.append(temp_lst)
-    df = pd.DataFrame(result, columns=['time', 'buy', 'up_sell', 'down_sell', 'score'])
-    df.to_sql("Score", con, if_exists='replace')
+    df = pd.DataFrame(result, columns=['time', 'buy', 'up_sell', 'down_sell', 'high_score', 'score'])
+    df.to_sql("High_Score", con, if_exists='replace')
 
 
 def find_sell_price(price, sell_factor2):
@@ -260,6 +260,21 @@ def find_sell_price(price, sell_factor2):
 
 def beepsound():
     sd.Beep(2000, 1000)
+
+
+def view_graph(date):
+    con = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/new_method_test.db")
+    cursor = con.cursor()
+    data = []
+    for i in date:
+        cursor.execute(f"SELECT * FROM '{i}'")
+        data.append(cursor.fetchall())
+    graph_data = []
+    for i in data:
+        graph_data.append(i[637][-2])
+    plt.plot(graph_data)
+    plt.show()
+    # low score도 보고싶은데
 
 
 @dataclass
@@ -374,16 +389,16 @@ if __name__ == "__main__":
                  '375500', '37550K', '378850', '380440', '383220', '383800', '38380K', '385590', '385600', '385710',
                  '385720', '950210', '900140']
     # "2021-06-30", "2021-07-01", "2021-07-02",  # 데이터가 너무 좋은 값으로 나와서 일단 제외
-    todays = ["2021-06-30", "2021-07-01", "2021-07-02"]
-    today = "2021-07-30"
-    method3_test(today, code_list)
-    # for today in todays:
-    #     method3_test(today, code_list)
     # data_filter(today, code_list)
-    # print("데이터 filtering 끝")
+    date_list = ["2021-06-30", "2021-07-01", "2021-07-02", "2021-07-19", "2021-07-22", "2021-07-26", "2021-07-27",
+                 "2021-07-28", "2021-07-29", "2021-07-30", "2021-08-02", "2021-08-04", "2021-08-05", "2021-08-06",
+                 "2021-08-09", "2021-08-10", "2021-08-11", "2021-08-12", "2021-08-13", "2021-08-17", "2021-08-19",
+                 "2021-08-20"]
+    for i in date_list:
+        method3_test(i, code_list)
+    view_total_data(date_list)
+    view_graph(date_list)
+    # method3_test("2021-08-17", code_list)
+    # view_total_data(date_list)
 
-    # print(today)
-    view_total_data()
-    # print("데이터 병합 끝")
-    # 날짜별로 폴더를 따로 만들어줘야할 것 같은데, 폴더도 자동생성이 가능한가?
-    # 가능은 한데 아직은 굳이
+
