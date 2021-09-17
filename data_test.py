@@ -1,3 +1,4 @@
+from typing import List, Tuple
 import pandas as pd
 import sqlite3
 from tqdm import tqdm
@@ -35,8 +36,8 @@ def data_filter(date, code_lst):
     for i in new_data:
         df = pd.DataFrame(new_data[i])
         df.to_sql(i, con2, if_exists='replace')
-        
-        
+
+
 # 원래는 구매할 수 있는 종목이 한정적이라 살 수 있는 종목의 개수에 limit 을 걸어야 하지만 이건 검증 과정이므로 생략
 def method1(data):  # 한 시점의 거래량이 그 전 지점에 비해 폭발적으로 늘어나는 경우
     # 이건 누적 데이터를 받아와서 해야할 것 같은데...?
@@ -261,6 +262,8 @@ def find_sell_price(price, sell_factor2):
 def beepsound():
     sd.Beep(2000, 1000)
 
+_price = int
+_now = int
 
 def view_graph(date):
     con = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/new_method_test.db")
@@ -279,14 +282,14 @@ def view_graph(date):
 
 @dataclass
 class Stock:
-    price_time: list
-    own_num: int = 0
-    not_yet: int = 0
-    sell_price: int = 0
-    order_num = str
-    own: bool = False
+    price_time: List[Tuple[_price, _now]] # 가격,시간을 적어놓은 리스트
+    own_num: int = 0 # 구매한 주 수량
+    not_yet: int = 0 # 아직 구매하지 못한것 <- 주문을 올렸지만 아직 체결되지 않은.
+    sell_price: int = 0 # 내가 주식을 구매하고 일정 퍼센트가 오르면 매도. (목표값)
+    order_num = str # 내가 주문한 숫자 == own_num이 되게 하는 것이 목표
+    own: bool = False # 내가 이 종목을 갖고 있는가
     undo: bool = False
-    after_trade: bool = False
+    after_trade: bool =  # 내가 한번이라도 (내 조건에 성립했는가)구매 했는가.
 
 
 # '002420', '003280', '003620', '007630', '010580', '011300', '011690', '012600',
