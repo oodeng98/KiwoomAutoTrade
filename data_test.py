@@ -210,7 +210,7 @@ def method3_test(date, code_lst):
                     if not temp:
                         temp = [0.33]
                     total_data.append([q, w, e, r, count_list[-1], count_list[0], count_list[1], count_list[2],
-                                       e * count_list[1] - r * count_list[0] - r * 0.8 * count_list[2]
+                                       e * count_list[1] - (r + 0.2) * count_list[0] - r * 0.8 * count_list[2]
                                        - 0.33 * (count_list[0] + count_list[1] + count_list[2]),
                                        max(temp) - (temp.index(max(temp)) + 1) * 0.33,
                                        min(temp) - (temp.index(min(temp)) + 1) * 0.33])
@@ -265,6 +265,7 @@ def beepsound():
 _price = int
 _now = int
 
+
 def view_graph(date):
     con = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/new_method_test.db")
     cursor = con.cursor()
@@ -274,7 +275,7 @@ def view_graph(date):
         data.append(cursor.fetchall())
     graph_data = []
     for i in data:
-        graph_data.append(i[637][-2])
+        graph_data.append(i[637][-3])
     plt.plot(graph_data)
     plt.show()
     # low score도 보고싶은데
@@ -283,13 +284,13 @@ def view_graph(date):
 @dataclass
 class Stock:
     price_time: List[Tuple[_price, _now]] # 가격,시간을 적어놓은 리스트
-    own_num: int = 0 # 구매한 주 수량
-    not_yet: int = 0 # 아직 구매하지 못한것 <- 주문을 올렸지만 아직 체결되지 않은.
-    sell_price: int = 0 # 내가 주식을 구매하고 일정 퍼센트가 오르면 매도. (목표값)
-    order_num = str # 내가 주문한 숫자 == own_num이 되게 하는 것이 목표
-    own: bool = False # 내가 이 종목을 갖고 있는가
+    own_num: int = 0  # 구매한 주 수량
+    not_yet: int = 0  # 아직 구매하지 못한것 <- 주문을 올렸지만 아직 체결되지 않은.
+    sell_price: int = 0  # 내가 주식을 구매하고 일정 퍼센트가 오르면 매도. (목표값)
+    order_num = str  # 내가 주문한 숫자 == own_num이 되게 하는 것이 목표
+    own: bool = False  # 내가 이 종목을 갖고 있는가
     undo: bool = False
-    after_trade: bool =  # 내가 한번이라도 (내 조건에 성립했는가)구매 했는가.
+    after_trade: bool = False  # 내가 한번이라도 (내 조건에 성립했는가)구매 했는가.
 
 
 # '002420', '003280', '003620', '007630', '010580', '011300', '011690', '012600',
@@ -393,15 +394,16 @@ if __name__ == "__main__":
                  '385720', '950210', '900140']
     # "2021-06-30", "2021-07-01", "2021-07-02",  # 데이터가 너무 좋은 값으로 나와서 일단 제외
     # data_filter(today, code_list)
-    date_list = ["2021-06-30", "2021-07-01", "2021-07-02", "2021-07-19", "2021-07-22", "2021-07-26", "2021-07-27",
-                 "2021-07-28", "2021-07-29", "2021-07-30", "2021-08-02", "2021-08-04", "2021-08-05", "2021-08-06",
-                 "2021-08-09", "2021-08-10", "2021-08-11", "2021-08-12", "2021-08-13", "2021-08-17", "2021-08-19",
-                 "2021-08-20"]
-    for i in date_list:
-        method3_test(i, code_list)
+    date = "2021-"
+    date_list = ['09-08', '09-09', '09-10', '09-13', '09-14', '09-15', '09-16', '09-28', '09-30', '10-06',
+                 '10-07', '10-12', '10-14', '10-18', '10-19', '10-21', '10-22', '10-26', '10-27', '10-29',
+                 '11-02', '11-03', '11-04', '11-08', '11-09', '11-10']
+    for i in range(len(date_list)):
+        date_list[i] = date + date_list[i]
+
+    # for i in date_list:
+    #     method3_test(i, code_list)
     view_total_data(date_list)
     view_graph(date_list)
-    # method3_test("2021-08-17", code_list)
-    # view_total_data(date_list)
-
+# 최우선 매수호가로 가져오는거라면 매수호가가 바뀌는 경우의 시간만 체크해주면 된다, 1퍼 내린 시간과 4퍼 오른 시간 간의 비교를 통해 알 수 있음
 
