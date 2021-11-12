@@ -22,10 +22,8 @@ def data_filter(date, code_lst):
             total_count += len(temp)
             if temp:
                 new_data[k] = {'price': [], 'deal': [], 'clock': []}
-                for i in range(len(temp)):
-                    if temp[i][1] * int(temp[i][2]) >= 10000000:  # 지금 데이터에는 deal이 +, -가 나뉘어져 있다.
-                        # + 데이터만 사용하는 것이 결과값이 더 좋지만 실제로는 어떻게 될지 모르겟음, 조금 더 지켜봐야 알 수 있을듯
-                        # 매수는 천만원 기준으로 하되, 매도는 실시간으로 해주는 것이 덜 손해일 수도 있음, 한번 확인 요망, 프로그램 수정해보기
+                for i in range(len(temp) - 1):
+                    if temp[i][1] != int(temp[i+1][1]):
                         new_data[k]['price'].append(temp[i][1])
                         new_data[k]['deal'].append(temp[i][2])
                         new_data[k]['clock'].append(temp[i][3])
@@ -134,8 +132,10 @@ def method3(data, time_factor, buy_factor, sell_factor1, sell_factor2):
     for i in range(len(data)):
         index, price, deal, time = data[i]
         price = eval(price)
-        price = max(price, -price)
+        price = abs(price)
         time = int(time[11:13]) * 60 + int(time[14:16])
+        if time < 540:
+            continue
         if not buy_price:
             price_time.append((price, time))
 
@@ -214,14 +214,13 @@ def method3_test(date, code_lst):
                                        - 0.33 * (count_list[0] + count_list[1] + count_list[2]),
                                        max(temp) - (temp.index(max(temp)) + 1) * 0.33,
                                        min(temp) - (temp.index(min(temp)) + 1) * 0.33])
-    con2 = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/new_method_test.db")
+    con2 = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/result.db")
     df = pd.DataFrame(total_data, columns=['time', 'buy', 'up_sell', 'down_sell', 'none', 'loss', 'benefit', 'timeout',
                                            'score', 'high_score', 'low_score'])
     # print(df)
     df.to_sql(date, con2, if_exists='replace')
 
 
-# 다 쓰고 원래대로 돌려주셈
 def view_total_data(date):
     con = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/new_method_test.db")
     cursor = con.cursor()
@@ -262,12 +261,9 @@ def find_sell_price(price, sell_factor2):
 def beepsound():
     sd.Beep(2000, 1000)
 
-_price = int
-_now = int
-
 
 def view_graph(date):
-    con = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/new_method_test.db")
+    con = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/result.db")
     cursor = con.cursor()
     data = []
     for i in date:
@@ -281,9 +277,11 @@ def view_graph(date):
     # low score도 보고싶은데
 
 
+_price = int
+_now = int
 @dataclass
 class Stock:
-    price_time: List[Tuple[_price, _now]] # 가격,시간을 적어놓은 리스트
+    price_time: List[Tuple[_price, _now]]  # 가격,시간을 적어놓은 리스트
     own_num: int = 0  # 구매한 주 수량
     not_yet: int = 0  # 아직 구매하지 못한것 <- 주문을 올렸지만 아직 체결되지 않은.
     sell_price: int = 0  # 내가 주식을 구매하고 일정 퍼센트가 오르면 매도. (목표값)
@@ -392,18 +390,17 @@ if __name__ == "__main__":
                  '350520', '352820', '353200', '35320K', '357120', '357250', '361610', '363280', '36328K', '365550',
                  '375500', '37550K', '378850', '380440', '383220', '383800', '38380K', '385590', '385600', '385710',
                  '385720', '950210', '900140']
-    # "2021-06-30", "2021-07-01", "2021-07-02",  # 데이터가 너무 좋은 값으로 나와서 일단 제외
-    # data_filter(today, code_list)
     date = "2021-"
     date_list = ['09-08', '09-09', '09-10', '09-13', '09-14', '09-15', '09-16', '09-28', '09-30', '10-06',
                  '10-07', '10-12', '10-14', '10-18', '10-19', '10-21', '10-22', '10-26', '10-27', '10-29',
-                 '11-02', '11-03', '11-04', '11-08', '11-09', '11-10']
+                 '11-02', '11-03', '11-04', '11-08', '11-09', '11-10', '11-11']
     for i in range(len(date_list)):
         date_list[i] = date + date_list[i]
 
-    # for i in date_list:
-    #     method3_test(i, code_list)
-    view_total_data(date_list)
-    view_graph(date_list)
+    for i in date_list:
+        data_filter(i, code_list)
+        method3_test(i, code_list)
+    # view_total_data(date_list)
+    # view_graph(date_list)
 # 최우선 매수호가로 가져오는거라면 매수호가가 바뀌는 경우의 시간만 체크해주면 된다, 1퍼 내린 시간과 4퍼 오른 시간 간의 비교를 통해 알 수 있음
 
