@@ -160,13 +160,9 @@ def method3(data, time_factor, buy_factor, sell_factor1, sell_factor2):
 
 def method3_test(date, code_lst):
     con = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/" + date + "_filter.db")
-    # 날짜 데이터를 수정해서 넣어줘야함
     cursor = con.cursor()
     time_factor_list = tqdm([1, 2, 3, 4, 5, 6, 7, 8])
     buy_factor_list = [3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7]
-    # time_factor 와 buy_factor 가 같으면 -1의 개수는 같다, 를 이용하면 더 빨리 돌려볼 수 있을 것 같은데?->성공
-    # buy_factor 가 증가하면 -1의 개수도 증가함
-    # 원래 대략 126초정도 걸림->처음엔 46초, 그 이후에는 20초대에서 처리가능
     sell_factor1_list = [2, 2.5, 3, 3.5, 4, 4.5, 5]
     sell_factor2_list = [1, 1.5, 2, 2.5]
     total_data = []
@@ -207,24 +203,18 @@ def method3_test(date, code_lst):
                                 temp.append(temp_temp + e)
                             else:
                                 temp.append(temp_temp - r)
-                    if not temp:
-                        temp = [0.33]
                     total_data.append([q, w, e, r, count_list[-1], count_list[0], count_list[1], count_list[2],
-                                       e * count_list[1] - (r + 0.2) * count_list[0] - r * 0.8 * count_list[2]
-                                       - 0.33 * (count_list[0] + count_list[1] + count_list[2]),
-                                       max(temp) - (temp.index(max(temp)) + 1) * 0.33,
-                                       min(temp) - (temp.index(min(temp)) + 1) * 0.33])
+                                       e * count_list[1] - r * count_list[0] - r * 0.5 * count_list[2]
+                                       - 0.33 * (count_list[0] + count_list[1] + count_list[2])])
     con2 = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/result.db")
     df = pd.DataFrame(total_data, columns=['time', 'buy', 'up_sell', 'down_sell', 'none', 'loss', 'benefit', 'timeout',
                                            'score', 'high_score', 'low_score'])
-    # print(df)
     df.to_sql(date, con2, if_exists='replace')
 
 
 def view_total_data(date):
-    con = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/new_method_test.db")
+    con = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/result.db")
     cursor = con.cursor()
-    # 이 부분은 수기로 추가해줘야함, 텍스트 파일로 저장해도 무관한데 이부분은
     data = []
     for i in date:
         cursor.execute(f"SELECT * FROM '{i}'")
@@ -232,12 +222,10 @@ def view_total_data(date):
     result = []
     for i in range(2016):
         temp = data[0][i]
-        high_score = 0
         score = 0
         for j in range(len(date)):
-            high_score += data[j][i][-2]
             score += data[j][i][-3]
-        temp_lst = [temp[1], temp[2], temp[3], temp[4], round(high_score / len(date), 2), round(score / len(date), 2)]
+        temp_lst = [temp[1], temp[2], temp[3], temp[4], round(score / len(date), 2)]
         result.append(temp_lst)
     df = pd.DataFrame(result, columns=['time', 'buy', 'up_sell', 'down_sell', 'high_score', 'score'])
     df.to_sql("High_Score", con, if_exists='replace')
@@ -274,7 +262,6 @@ def view_graph(date):
         graph_data.append(i[637][-3])
     plt.plot(graph_data)
     plt.show()
-    # low score도 보고싶은데
 
 
 _price = int
@@ -393,14 +380,13 @@ if __name__ == "__main__":
     date = "2021-"
     date_list = ['09-08', '09-09', '09-10', '09-13', '09-14', '09-15', '09-16', '09-28', '09-30', '10-06',
                  '10-07', '10-12', '10-14', '10-18', '10-19', '10-21', '10-22', '10-26', '10-27', '10-29',
-                 '11-02', '11-03', '11-04', '11-08', '11-09', '11-10', '11-11']
+                 '11-02', '11-03', '11-04', '11-08', '11-09', '11-10', '11-11', '11-12']
     for i in range(len(date_list)):
         date_list[i] = date + date_list[i]
 
     for i in date_list:
-        data_filter(i, code_list)
         method3_test(i, code_list)
-    # view_total_data(date_list)
-    # view_graph(date_list)
+
+    view_total_data(date_list)
 # 최우선 매수호가로 가져오는거라면 매수호가가 바뀌는 경우의 시간만 체크해주면 된다, 1퍼 내린 시간과 4퍼 오른 시간 간의 비교를 통해 알 수 있음
 
