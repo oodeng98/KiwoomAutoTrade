@@ -30,7 +30,7 @@ def data_filter(date, code_lst):
                 new_count += len(new_data[k]['price'])
         except sqlite3.OperationalError:
             pass
-    print(total_count, new_count)
+    # print(total_count, new_count)
     for i in new_data:
         df = pd.DataFrame(new_data[i])
         df.to_sql(i, con2, if_exists='replace')
@@ -39,7 +39,6 @@ def data_filter(date, code_lst):
 # 원래는 구매할 수 있는 종목이 한정적이라 살 수 있는 종목의 개수에 limit 을 걸어야 하지만 이건 검증 과정이므로 생략
 def method1(data):  # 한 시점의 거래량이 그 전 지점에 비해 폭발적으로 늘어나는 경우
     # 이건 누적 데이터를 받아와서 해야할 것 같은데...?
-    # 일단 한 알고리즘에 집중하고 나머지는 백준 풀면서 시간 보내봐야함
     # 그래서 지금 받아야하는 데이터에 시간 데이터도 추가함
     pass
 
@@ -56,7 +55,7 @@ def method2(data, time_factor, buy_factor, sell_factor1, sell_factor2):
     for i in range(len(data)):
         index, price, deal, time = data[i]
         price = eval(price)
-        price = max(price, -price)
+        price = abs(price)
         time = int(time[11:13]) * 60 + int(time[14:16])
         if not buy_price:
             price_time.append((price, time))
@@ -78,9 +77,7 @@ def method2(data, time_factor, buy_factor, sell_factor1, sell_factor2):
     if buy_price:
         return 2
     return -1
-# time_factor, buy_factor, sell_factor1, sell_factor2
 # -1은 해당사항 없음, 0은 손해, 1은 이득, 2는 매수는 했지만 매도 조건에는 충족되지 않은 경우
-# 주가로 하지 말고 거래량으로 매도조건을 걸어볼까?
 
 
 def method2_test(date, code_lst):
@@ -89,9 +86,6 @@ def method2_test(date, code_lst):
     cursor = con.cursor()
     time_factor_list = tqdm([3, 4, 5, 6, 7, 8])
     buy_factor_list = [3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8]
-    # time_factor 와 buy_factor 가 같으면 -1의 개수는 같다, 를 이용하면 더 빨리 돌려볼 수 있을 것 같은데?->성공
-    # buy_factor 가 증가하면 -1의 개수도 증가함
-    # 원래 대략 126초정도 걸림->처음엔 46초, 그 이후에는 20초대에서 처리가능
     sell_factor1_list = [2, 2.5, 3, 3.5, 4, 4.5, 5]
     sell_factor2_list = [1, 1.5, 2, 2.5]
     total_data = []
@@ -125,14 +119,11 @@ def method2_test(date, code_lst):
 
 
 def method3(data, time_factor, buy_factor, sell_factor1, sell_factor2):
-    # method2를 사용해서 하루에 최대 이익을 얼마나 볼 수 있는지 그래프로 나타낼 예정
-    # 베이스는 method2를 그대로 사용
     price_time = []
     buy_price = 0
     for i in range(len(data)):
         index, price, deal, time = data[i]
-        price = eval(price)
-        price = abs(price)
+        price = abs(float(price))
         time = int(time[11:13]) * 60 + int(time[14:16])
         if time < 540:
             continue
@@ -145,17 +136,18 @@ def method3(data, time_factor, buy_factor, sell_factor1, sell_factor2):
             high = max(price_time, key=lambda x: x[0])
             low = min(price_time, key=lambda x: x[0])
 
-            if high[0] >= low[0] * (1 + 1 / 100 * buy_factor) and high[1] > low[1]:  # 매수 조건의 인자
+            if high[0] >= low[0] * (1 + 0.01 * buy_factor) and high[1] > low[1]:  # 매수 조건의 인자
                 price_time = [(price, time)]
                 buy_price = price
         else:  # 매도 조건의 인자들 + 조건 4
-            if buy_price * (1 + 1 / 100 * sell_factor1) <= price:
-                return 1, time
-            elif price <= buy_price * (1 - 1 / 100 * sell_factor2):
-                return 0, time
+            if find_sell_price(buy_price, sell_factor1) <= price:
+                return 1
+            elif price <= find_sell_price(buy_price, -sell_factor2):
+                return 0
     if buy_price:
         return 2
     return -1
+# -1은 해당사항 없음, 0은 손해, 1은 이득, 2는 timeout
 
 
 def method3_test(date, code_lst):
@@ -173,42 +165,23 @@ def method3_test(date, code_lst):
             for e in sell_factor1_list:
                 for r in sell_factor2_list:
                     count_list[0], count_list[1], count_list[2] = 0, 0, 0
-                    check_time_element = []
                     for k in code_lst:
                         try:
                             if k not in minus_one_list:
                                 cursor.execute(f"SELECT * FROM '{k}'")
                                 temp = np.array(cursor.fetchall())  # index, price, deal, clock
                                 result = method3(temp, q, w, e, r)  # method position
-                                if type(result) is tuple:
-                                    count_list[result[0]] += 1
-                                    check_time_element.append(result)
-                                else:
-                                    count_list[result] += 1
-                                    if result == -1:
-                                        minus_one_list[k] = 0
+                                count_list[result] += 1
+                                if result == -1:
+                                    minus_one_list[k] = 0
                         except sqlite3.OperationalError:
                             pass
-                    check_time_element.sort(key=lambda x: x[1])
-                    temp = []
-                    for i in check_time_element:
-                        if not temp:
-                            if i[0] == 1:
-                                temp.append(e)
-                            else:
-                                temp.append(r)
-                        else:
-                            temp_temp = temp[-1]
-                            if i[0] == 1:
-                                temp.append(temp_temp + e)
-                            else:
-                                temp.append(temp_temp - r)
                     total_data.append([q, w, e, r, count_list[-1], count_list[0], count_list[1], count_list[2],
                                        e * count_list[1] - r * count_list[0] - r * 0.5 * count_list[2]
-                                       - 0.33 * (count_list[0] + count_list[1] + count_list[2])])
+                                       - 0.26 * (count_list[0] + count_list[1] + count_list[2])])
     con2 = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/result.db")
     df = pd.DataFrame(total_data, columns=['time', 'buy', 'up_sell', 'down_sell', 'none', 'loss', 'benefit', 'timeout',
-                                           'score', 'high_score', 'low_score'])
+                                           'score'])
     df.to_sql(date, con2, if_exists='replace')
 
 
@@ -220,37 +193,40 @@ def view_total_data(date):
         cursor.execute(f"SELECT * FROM '{i}'")
         data.append(cursor.fetchall())
     result = []
-    for i in range(2016):
+    for i in range(len(data[0])):
         temp = data[0][i]
         score = 0
         for j in range(len(date)):
-            score += data[j][i][-3]
+            score += data[j][i][-1]
         temp_lst = [temp[1], temp[2], temp[3], temp[4], round(score / len(date), 2)]
         result.append(temp_lst)
-    df = pd.DataFrame(result, columns=['time', 'buy', 'up_sell', 'down_sell', 'high_score', 'score'])
+    df = pd.DataFrame(result, columns=['time', 'buy', 'up_sell', 'down_sell', 'score'])
     df.to_sql("High_Score", con, if_exists='replace')
 
 
 def find_sell_price(price, sell_factor2):
     # ~1000~5000~~10000~~50000~~~100000~~~500000~~~~
     # 1    5    10     50     100      500      1000
-    # 이거로 해결 가능, 거래 도중 가격이 변경되면 단위도 변경된다
+    # 거래 도중 가격이 변경되면 단위도 변경된다
     standard_list = [1000, 5000, 10000, 50000, 100000, 500000, 1000000]
-    sell_price = price * (1 + 1 / 100 * sell_factor2)
+    sell_price = price * (1 + 0.01 * sell_factor2)
     standard = 5000
     for i in standard_list:
         if sell_price < i:
             standard = i // 1000
             break
-    sell_price = (sell_price // standard - 1) * standard
-    return int(sell_price)
+    if sell_factor2 < 0:
+        sell_price = (sell_price // standard + 1) * standard  # 하한선이 되기 전에 알림을 주는 역할이므로 이게 맞음
+    else:
+        sell_price = (sell_price // standard - 1) * standard  # 최우선 매수호가가 가격의 기준이므로 최우선 매도호가는 한칸 내려야함
+    return sell_price
 
 
 def beepsound():
     sd.Beep(2000, 1000)
 
 
-def view_graph(date):
+def view_graph(date, index):
     con = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/result.db")
     cursor = con.cursor()
     data = []
@@ -259,7 +235,8 @@ def view_graph(date):
         data.append(cursor.fetchall())
     graph_data = []
     for i in data:
-        graph_data.append(i[637][-3])
+        graph_data.append(i[index][-1])
+    print(graph_data)
     plt.plot(graph_data)
     plt.show()
 
@@ -387,6 +364,5 @@ if __name__ == "__main__":
     for i in date_list:
         method3_test(i, code_list)
 
-    view_total_data(date_list)
-# 최우선 매수호가로 가져오는거라면 매수호가가 바뀌는 경우의 시간만 체크해주면 된다, 1퍼 내린 시간과 4퍼 오른 시간 간의 비교를 통해 알 수 있음
-
+    print(f"데이터는 총 {len(date_list)}일 동안 수집하였고, 수익률은 결과값을 limit값으로 나눠줘야 합니다.")
+# 배열을 싹 다 numpy로 바꿔주면 좀 더 빨라지려나?동주한테 물어봐야겠음
