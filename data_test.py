@@ -144,6 +144,7 @@ def method3(data, time_factor, buy_factor, sell_factor1, sell_factor2):
                 return 1
             elif price <= find_sell_price(buy_price, -sell_factor2):
                 return 0
+            #  timeout 해결해야할듯
     if buy_price:
         return 2
     return -1
@@ -159,27 +160,29 @@ def method3_test(date, code_lst):
     sell_factor2_list = [1, 1.5, 2, 2.5]
     total_data = []
     for q in time_factor_list:
-        minus_one_list = {}
+        count_list = {-1: {}, 0: 0, 1: 0, 2: 0}
         for w in buy_factor_list:
-            count_list = {-1: len(minus_one_list), 0: 0, 1: 0, 2: 0}
             for e in sell_factor1_list:
+                count_list[2] = {}
                 for r in sell_factor2_list:
                     count_list[0], count_list[1], count_list[2] = 0, 0, 0
                     for k in code_lst:
                         try:
-                            if k not in minus_one_list:
+                            if k not in count_list[-1]:
                                 cursor.execute(f"SELECT * FROM '{k}'")
                                 temp = np.array(cursor.fetchall())  # index, price, deal, clock
                                 result = method3(temp, q, w, e, r)  # method position
-                                count_list[result] += 1
-                                if result == -1:
-                                    minus_one_list[k] = 0
+                                if result in [-1]:
+                                    count_list[-1][k] = 0
+                                else:
+                                    count_list[result] += 1
+
                         except sqlite3.OperationalError:
                             pass
-                    total_data.append([q, w, e, r, count_list[-1], count_list[0], count_list[1], count_list[2],
+                    total_data.append([q, w, e, r, len(count_list[-1]), count_list[0], count_list[1], count_list[2],
                                        e * count_list[1] - r * count_list[0] - r * 0.5 * count_list[2]
                                        - 0.26 * (count_list[0] + count_list[1] + count_list[2])])
-    con2 = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/result.db")
+    con2 = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/test.db")
     df = pd.DataFrame(total_data, columns=['time', 'buy', 'up_sell', 'down_sell', 'none', 'loss', 'benefit', 'timeout',
                                            'score'])
     df.to_sql(date, con2, if_exists='replace')
@@ -226,7 +229,7 @@ def beepsound():
     sd.Beep(2000, 1000)
 
 
-def view_graph(date, index):
+def view_best_score_graph(date, index):
     con = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/result.db")
     cursor = con.cursor()
     data = []
@@ -237,7 +240,7 @@ def view_graph(date, index):
     for i in data:
         graph_data.append(i[index][-1])
     print(graph_data)
-    plt.plot(graph_data)
+    plt.bar(graph_data)
     plt.show()
 
 
@@ -362,7 +365,8 @@ if __name__ == "__main__":
         date_list[i] = date + date_list[i]
 
     for i in date_list:
-        method3_test(i, code_list)
+        method3_test('2021-09-08', code_list)
+        break
 
     print(f"데이터는 총 {len(date_list)}일 동안 수집하였고, 수익률은 결과값을 limit값으로 나눠줘야 합니다.")
 # 배열을 싹 다 numpy로 바꿔주면 좀 더 빨라지려나?동주한테 물어봐야겠음
