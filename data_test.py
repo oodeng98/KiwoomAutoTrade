@@ -6,10 +6,11 @@ import numpy as np
 import winsound as sd
 from dataclasses import dataclass
 import matplotlib.pyplot as plt
+from pykrx import stock
 
 
 def data_filter(date, code_lst):
-    con1 = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/" + date + ".db")  # 날짜 데이터도 수정 필요
+    con1 = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/" + date + ".db")
     cursor1 = con1.cursor()
     con2 = sqlite3.connect("c:/Users/ooden/PycharmProjects/pythonProject1/stock_data/" + date + '_filter.db')
     new_data = {}
@@ -26,11 +27,12 @@ def data_filter(date, code_lst):
                     if temp[i][1] != int(temp[i+1][1]):
                         new_data[k]['price'].append(temp[i][1])
                         new_data[k]['deal'].append(temp[i][2])
-                        new_data[k]['clock'].append(temp[i][3])
+                        time = int(temp[i][3][11:13]) * 60 + int(temp[i][3][14:16])
+                        new_data[k]['clock'].append(time)
                 new_count += len(new_data[k]['price'])
         except sqlite3.OperationalError:
             pass
-    # print(total_count, new_count)
+    print(total_count, new_count)
     for i in new_data:
         df = pd.DataFrame(new_data[i])
         df.to_sql(i, con2, if_exists='replace')
@@ -124,9 +126,6 @@ def method3(data, time_factor, buy_factor, sell_factor1, sell_factor2):
     for i in range(len(data)):
         index, price, deal, time = data[i]
         price = abs(float(price))
-        time = int(time[11:13]) * 60 + int(time[14:16])
-        if time < 540:
-            continue
         if not buy_price:
             price_time.append((price, time))
 
@@ -144,9 +143,10 @@ def method3(data, time_factor, buy_factor, sell_factor1, sell_factor2):
                 return 1
             elif price <= find_sell_price(buy_price, -sell_factor2):
                 return 0
-            #  timeout 해결해야할듯
     if buy_price:
-        return 2
+        price = abs(float(data[-1][1]))
+        result = (price - buy_price) / buy_price * 100 - 0.26
+        return 2, result
     return -1
 # -1은 해당사항 없음, 0은 손해, 1은 이득, 2는 timeout
 
@@ -172,39 +172,22 @@ def method3_test(date, code_lst):
                                 cursor.execute(f"SELECT * FROM '{k}'")
                                 temp = np.array(cursor.fetchall())  # index, price, deal, clock
                                 result = method3(temp, q, w, e, r)  # method position
-                                if result in [-1]:
+                                if result == -1:
                                     count_list[-1][k] = 0
+                                elif result == 2:
+                                    count_list[result[0]] = result[1]
                                 else:
                                     count_list[result] += 1
 
                         except sqlite3.OperationalError:
                             pass
                     total_data.append([q, w, e, r, len(count_list[-1]), count_list[0], count_list[1], count_list[2],
-                                       e * count_list[1] - r * count_list[0] - r * 0.5 * count_list[2]
-                                       - 0.26 * (count_list[0] + count_list[1] + count_list[2])])
-    con2 = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/test.db")
+                                       e * count_list[1] - r * count_list[0] + count_list[2]
+                                       - 0.26 * (count_list[0] + count_list[1])])
+    con2 = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/result.db")
     df = pd.DataFrame(total_data, columns=['time', 'buy', 'up_sell', 'down_sell', 'none', 'loss', 'benefit', 'timeout',
                                            'score'])
     df.to_sql(date, con2, if_exists='replace')
-
-
-def view_total_data(date):
-    con = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/result.db")
-    cursor = con.cursor()
-    data = []
-    for i in date:
-        cursor.execute(f"SELECT * FROM '{i}'")
-        data.append(cursor.fetchall())
-    result = []
-    for i in range(len(data[0])):
-        temp = data[0][i]
-        score = 0
-        for j in range(len(date)):
-            score += data[j][i][-1]
-        temp_lst = [temp[1], temp[2], temp[3], temp[4], round(score / len(date), 2)]
-        result.append(temp_lst)
-    df = pd.DataFrame(result, columns=['time', 'buy', 'up_sell', 'down_sell', 'score'])
-    df.to_sql("High_Score", con, if_exists='replace')
 
 
 def find_sell_price(price, sell_factor2):
@@ -229,18 +212,71 @@ def beepsound():
     sd.Beep(2000, 1000)
 
 
-def view_best_score_graph(date, index):
+def view_total_data(date_lst):
     con = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/result.db")
     cursor = con.cursor()
     data = []
-    for i in date:
+    graph_data = []
+    for i in date_lst:
+        cursor.execute(f"SELECT * FROM '{i}'")
+        data.append(cursor.fetchall())
+    result = []
+    for i in range(len(data[0])):
+        temp = data[0][i]
+        score = 0
+        for j in range(len(date_lst)):
+            score += data[j][i][-1]
+        temp_lst = [temp[1], temp[2], temp[3], temp[4], round(score / len(date_lst), 2)]
+        result.append(temp_lst)
+        graph_data.append(temp_lst[-1])
+    df = pd.DataFrame(result, columns=['time', 'buy', 'up_sell', 'down_sell', 'score'])
+    df.to_sql("Result", con, if_exists='replace')
+    plt.bar(range(0, len(graph_data)), graph_data)
+    plt.show()
+
+
+def view_best_score_graph(date_lst):
+    con = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/result.db")
+    cursor = con.cursor()
+    data = []
+
+    cursor.execute('SELECT * FROM Result')
+    result_data = cursor.fetchall()
+    index = max(result_data, key=lambda x: x[-1])[0]
+
+    for i in date_lst:
         cursor.execute(f"SELECT * FROM '{i}'")
         data.append(cursor.fetchall())
     graph_data = []
     for i in data:
         graph_data.append(i[index][-1])
     print(graph_data)
-    plt.bar(graph_data)
+    plt.bar(range(len(date_lst)), graph_data)
+    plt.show()
+
+
+def view_kospi_graph(date_lst):
+    for i in range(len(date_lst)):
+        date_lst[i] = date_lst[i].replace('-', '')
+
+    kospi = []
+    for i in date_lst:
+        kospi.append(stock.get_index_price_change_by_ticker(i, i, "KOSPI").loc['코스피']['등락률'])
+
+    plt.bar(range(len(kospi)), kospi)
+    plt.show()
+
+
+def view_day_graph(date):
+    con = sqlite3.connect("C:/Users/ooden/PycharmProjects/pythonProject1/stock_data/result.db")
+    cursor = con.cursor()
+    data = []
+    cursor.execute(f"SELECT * FROM '{date}'")
+    data.append(cursor.fetchall())
+    graph_data = []
+    for i in data[0]:
+        graph_data.append(i[-1])
+    plt.bar(range(0, len(graph_data)), graph_data)
     plt.show()
 
 
@@ -360,13 +396,12 @@ if __name__ == "__main__":
     date = "2021-"
     date_list = ['09-08', '09-09', '09-10', '09-13', '09-14', '09-15', '09-16', '09-28', '09-30', '10-06',
                  '10-07', '10-12', '10-14', '10-18', '10-19', '10-21', '10-22', '10-26', '10-27', '10-29',
-                 '11-02', '11-03', '11-04', '11-08', '11-09', '11-10', '11-11', '11-12']
+                 '11-02', '11-03', '11-04', '11-08', '11-09', '11-10', '11-11', '11-12', '11-16', '11-17']
     for i in range(len(date_list)):
         date_list[i] = date + date_list[i]
 
     for i in date_list:
-        method3_test('2021-09-08', code_list)
-        break
+        data_filter(i, code_list)
 
-    print(f"데이터는 총 {len(date_list)}일 동안 수집하였고, 수익률은 결과값을 limit값으로 나눠줘야 합니다.")
+    #  print(f"데이터는 총 {len(date_list)}일 동안 수집하였고, 수익률은 결과값을 limit값으로 나눠줘야 합니다.")
 # 배열을 싹 다 numpy로 바꿔주면 좀 더 빨라지려나?동주한테 물어봐야겠음
